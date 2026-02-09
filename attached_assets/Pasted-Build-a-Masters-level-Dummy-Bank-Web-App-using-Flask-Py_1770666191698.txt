@@ -1,0 +1,159 @@
+Build a Masters-level “Dummy Bank Web App” using Flask (Python) on Replit.
+0) Constraints & Goals
+This is a demo/simulation bank, not real banking.
+Must be easy to run in Replit with one click.
+Use secure and realistic patterns: password hashing, sessions, CSRF, server-side validation, audit logs, database transactions for money transfers.
+Make it look professional for a Masters project (good structure, README, tests, clear UI).
+1) Tech Stack (use exactly this unless impossible on Replit)
+Python 3
+Flask
+SQLAlchemy ORM
+Flask-Migrate (Alembic)
+Flask-Login (authentication)
+Flask-WTF (forms + CSRF)
+Werkzeug password hashing
+pytest for tests
+Database:
+Prefer SQLite for Replit simplicity (file-based) but design so it can switch to Postgres later via environment variable DATABASE_URL.
+2) App Features (MVP must-have)
+A) Authentication & Users
+Register user: full name, email, phone, password
+Login / logout using Flask-Login
+Passwords hashed with werkzeug
+Role-based access:
+customer
+admin
+User status:
+active
+frozen (cannot login or transact)
+B) Accounts
+Each customer can create at least one account:
+account type: savings or current
+account number: unique, generated (10 digits)
+currency: default “NGN”
+balance stored as Decimal / numeric
+Account status: active or closed
+C) Transactions (Ledger)
+Create a proper ledger-like model:
+Transaction fields:
+reference (unique)
+type: deposit, transfer, billpay
+amount (Decimal)
+from_account_id (nullable for deposit)
+to_account_id (nullable for billpay)
+narration
+status: pending, success, failed
+created_at timestamp
+Ensure atomicity for transfers: debit + credit must occur within one database transaction.
+Prevent negative balances.
+Record transactions even if failed (status=failed with reason).
+D) Operations (Customer)
+Dashboard: show accounts + balances
+Transaction history page (filter by date/type)
+Deposit simulation: customer can “deposit” into their account (adds balance)
+Transfer:
+Send money to another user via account number
+Validate recipient exists and is active
+Validate sender has sufficient funds
+Add narration
+Bill payment simulation:
+Pick biller type (e.g., Airtime, Electricity, Internet)
+Amount deducted from customer account
+Transaction recorded
+E) Admin Dashboard
+Admin login with role admin
+Admin can:
+View all users
+Freeze/unfreeze a user
+View all transactions
+View audit logs
+Optionally: admin can “seed” demo money into any account (as deposit) for testing.
+F) Audit Logging (Security/Accountability)
+Implement audit log model:
+actor_user_id
+action (LOGIN_SUCCESS, LOGIN_FAIL, REGISTER, TRANSFER, DEPOSIT, BILLPAY, FREEZE_USER, UNFREEZE_USER)
+ip_address
+metadata JSON/text
+created_at
+3) UI Requirements
+Use Jinja templates + Bootstrap (or simple CSS).
+Pages:
+Home / Landing
+Register
+Login
+Customer Dashboard
+Create Account
+Deposit
+Transfer
+Bill Pay
+Transactions list
+Admin Dashboard
+Admin Users list
+Admin Transactions list
+Admin Audit logs
+Flash messages for success/error.
+Navigation bar changes based on login + role.
+4) Code Quality & Structure
+Use a clean project structure like:
+app/
+__init__.py (create_app pattern)
+extensions.py (db, login_manager, migrate, csrf)
+models.py
+services/ (business logic)
+account_service.py (create account, generate acct no)
+transaction_service.py (deposit, transfer, billpay with atomic transactions)
+audit_service.py
+auth/routes.py
+bank/routes.py (customer operations)
+admin/routes.py
+templates/ (Jinja)
+static/
+migrations/
+tests/
+run.py or main.py for Replit entry point
+5) Business Rules (must implement)
+Balances must never become negative.
+Transfers must be atomic (no partial debit/credit).
+Frozen users cannot login; if already logged in, block transactions.
+Account number must be unique.
+Amount must be > 0.
+Store money values as Decimal / Numeric with 2dp.
+Use server-side validation (WTForms).
+6) Seed Data / Demo Setup
+Provide a script or command to create:
+1 admin user (email: admin@demo.com, password: Admin123!)
+2 customer users (alice@demo.com, bob@demo.com, password: Password123!)
+Create accounts for them
+Give Alice an initial deposit
+Make it easy to run in Replit with a single command.
+7) Tests (minimum)
+Write pytest tests for:
+registration creates user
+login works
+create account generates unique account number
+deposit increases balance and creates transaction
+transfer decreases sender and increases recipient atomically
+transfer fails on insufficient funds without changing balances
+frozen user blocked from transfer
+8) Documentation
+Create a strong README.md including:
+Project overview (dummy bank web app for Masters project)
+Features list
+Tech stack
+How to run on Replit
+How to seed demo users
+Admin credentials
+Screenshots section placeholder
+Security notes (hashing, CSRF, audit logs, transactional integrity)
+Limitations and future improvements
+9) Replit Compatibility
+Provide a replit.nix only if needed; otherwise keep simple.
+Ensure app runs with flask run or python main.py.
+Use HOST=0.0.0.0 and port from environment if required.
+10) Deliverables
+When finished, output:
+All code files created
+Instructions on how to run
+Where to click in the UI to demo core flows
+Any environment variables required
+Start by scaffolding the project, then implement models, then auth, then customer flows, then admin, then tests, then README. Keep commits/steps logical.
