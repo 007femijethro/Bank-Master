@@ -1,0 +1,161 @@
+Turn your existing “dummy bank” into a Credit Union
+Currency + branding
+Switch currency to USD ($) everywhere (formatting + seed data).
+Rename concepts for realism:
+“Customer” → Member
+“Account” → Share Account (Savings) / Checking
+“Admin” → Staff / Teller / Back-office
+Add Credit Union fields:
+CU name, routing number (fake), NCUA disclaimer (demo), branch info, member number.
+What you asked for (make these your next build tasks)
+1) Admin balance control (ledger-safe)
+Instead of “editing balance directly”, make admin do adjustment transactions (this is how real systems protect integrity):
+Admin can add, remove, or set balance via:
+Adjustment Credit (adds)
+Adjustment Debit (removes)
+Balance Correction (set balance by posting a correction entry)
+Every action requires:
+reason code + notes
+staff user id
+audit log entry
+✅ This keeps your app defendable: “balances are derived from ledger entries.”
+2) Account opening requires approval
+Add Account Application workflow:
+Member submits application:
+account type (Share Savings / Checking)
+initial deposit amount (optional)
+identity fields (KYC-lite): SSN last 4, DOB, address, ID type, ID number (fake)
+employment (optional)
+Admin/Staff can:
+approve (creates the account)
+reject (with reason)
+request more info
+Statuses:
+submitted → under_review → approved / rejected
+3) Debit card section + credit card “coming soon”
+Implement Debit Cards fully; credit card as stub.
+Debit card
+issue card (virtual card record)
+card number masked, expiry, status: active/frozen/replaced
+card controls: freeze/unfreeze, spending limits (daily), merchant category block (optional)
+PIN set/reset (simulated)
+card replacement (new card number, old card deactivated)
+Credit card (Coming Soon)
+show “pre-qualify” form (store interest)
+show “available products” page but disabled
+admin can create “credit card application” records (future feature)
+4) Admin can transact
+Give staff “teller” capabilities:
+post deposit/withdrawal (cash)
+internal transfer on behalf of member (with permission)
+reverse a transaction (within rules)
+create fee transactions (NSF fee, monthly maintenance, etc.)
+Add permissions:
+role = admin isn’t enough — create granular permissions:
+can_post_transactions
+can_approve_accounts
+can_issue_cards
+can_reverse_transactions
+5) Transaction types
+Create a proper transaction taxonomy. Example:
+Transaction.type
+deposit_cash
+deposit_mobile
+withdrawal_cash
+transfer_internal
+billpay
+fee
+adjustment_credit
+adjustment_debit
+reversal
+Also add:
+channel: web, admin, mobile_deposit
+direction: credit / debit
+status: pending, posted, reversed, failed
+6) Mobile deposit
+This will wow a grader.
+Flow:
+Member uploads check images (front/back) (store in filesystem or DB blob)
+Enter amount + check number
+App runs validations:
+amount > 0
+image present
+daily deposit limit not exceeded
+account active
+Status lifecycle:
+submitted → under_review → accepted / rejected
+Admin reviews and accepts/rejects
+When accepted: post a deposit_mobile transaction
+Optional realism:
+“Funds availability”: immediate partial credit, rest on hold.
+More things to add to make it feel REAL (pick what fits your time)
+A) Core “credit union realism” features
+Membership application + membership approval
+Before accounts: become a “member” first.
+Share certificates (CDs)
+Terms, interest, early withdrawal penalty.
+Joint accounts
+Add a joint owner, permissions, survivorship checkbox.
+Beneficiaries
+POD (Payable on Death) beneficiaries list.
+B) Banking rules & compliance (Masters-friendly)
+KYC / CIP checklist (simulated)
+Required fields + “verified by staff” toggle.
+OFAC/Watchlist check simulation
+Fake list matching based on name; flag for review.
+Suspicious activity flags
+repeated failed login
+large transfer threshold
+too many mobile deposits
+Audit trail viewer (admin)
+Filter by user/action/date.
+C) Holds, disputes, reversals (very realistic)
+Transaction reversal rules
+only admin
+only within X hours
+store reversal reason + linked original tx
+Funds holds
+mobile deposit hold
+large deposit hold
+release hold by admin
+Chargeback / dispute (stub)
+Create dispute tickets with statuses.
+D) Notifications & statements (looks polished)
+Email notifications (or in-app notifications)
+deposit posted
+transfer completed
+card frozen
+Monthly statements (PDF)
+opening/closing balance
+transaction list
+e-Receipts
+downloadable receipt per transaction
+E) Security upgrades (easy points)
+2FA / OTP simulation
+via email code
+Device/session management
+show active sessions, “logout all devices”
+Rate limiting login
+Role-based access control with permissions table
+F) Credit union UI/UX polish
+“Branch / Contact” page + hours + routing/account info
+Product catalog
+Checking, Savings, CDs, Loans (some “coming soon”)
+Member profile
+membership number, join date, membership status
+Teller-style admin UI
+search member
+post transaction
+review queue (account apps + deposits)
+G) Advanced (only if you want to flex)
+Double-entry accounting
+Every transaction creates journal entries:
+member accounts
+CU cash account
+fee income account
+Interest accrual
+daily interest calculation on savings/CDs
+Loan module
+loan applications
+amortization schedule
+payments posting
