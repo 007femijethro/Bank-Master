@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertUserSchema, users, accounts, transactions, auditLogs } from './schema';
+import { insertUserSchema, users, accounts, transactions, auditLogs, accountApplications } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -72,9 +72,9 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/accounts' as const,
-      input: z.object({ type: z.enum(["savings", "current"]) }),
+      input: z.object({ type: z.enum(["share_savings", "checking"]) }),
       responses: {
-        201: z.custom<typeof accounts.$inferSelect>(),
+        201: z.custom<typeof accountApplications.$inferSelect>(),
         400: errorSchemas.validation,
       },
     },
@@ -82,7 +82,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/accounts/lookup/:accountNumber' as const,
       responses: {
-        200: z.object({ id: z.number(), fullName: z.string() }), // Minimal info for validation
+        200: z.object({ id: z.number(), fullName: z.string() }),
         404: errorSchemas.notFound,
       },
     },
@@ -161,6 +161,38 @@ export const api = {
       path: '/api/admin/audit-logs' as const,
       responses: {
         200: z.array(z.custom<typeof auditLogs.$inferSelect>()),
+        403: errorSchemas.forbidden,
+      },
+    },
+    applications: {
+      method: 'GET' as const,
+      path: '/api/admin/applications' as const,
+      responses: {
+        200: z.array(z.custom<typeof accountApplications.$inferSelect>()),
+        403: errorSchemas.forbidden,
+      },
+    },
+    updateApplication: {
+      method: 'PATCH' as const,
+      path: '/api/admin/applications/:id' as const,
+      input: z.object({ status: z.enum(["approved", "rejected"]), reason: z.string().optional() }),
+      responses: {
+        200: z.custom<typeof accountApplications.$inferSelect>(),
+        403: errorSchemas.forbidden,
+      },
+    },
+    adjustBalance: {
+      method: 'POST' as const,
+      path: '/api/admin/adjust-balance' as const,
+      input: z.object({
+        accountId: z.number(),
+        amount: z.string(),
+        type: z.enum(["adjustment_credit", "adjustment_debit"]),
+        reasonCode: z.string(),
+        narration: z.string().optional()
+      }),
+      responses: {
+        200: z.custom<typeof transactions.$inferSelect>(),
         403: errorSchemas.forbidden,
       },
     },
