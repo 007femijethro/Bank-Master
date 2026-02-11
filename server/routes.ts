@@ -124,6 +124,7 @@ export async function registerRoutes(
   if (existingUsers.length === 0) {
     const adminHash = await storage.hashPassword("Admin123!");
     await storage.createUser({ email: "staff@demo.com", password: adminHash, fullName: "CU Staff", role: "staff", status: "active", phone: "0000000000" });
+    await storage.createUser({ email: "admin@demo.com", password: adminHash, fullName: "Admin User", role: "staff", status: "active", phone: "0000000000" });
   }
 
   return httpServer;
