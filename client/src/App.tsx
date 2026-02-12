@@ -27,7 +27,7 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
     return <Redirect to="/" />;
   }
 
-  if (adminOnly && user.role !== 'admin') {
+  if (adminOnly && user.role !== 'staff') {
     return <Redirect to="/dashboard" />;
   }
 

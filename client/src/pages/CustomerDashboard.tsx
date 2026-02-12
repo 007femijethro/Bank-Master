@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
