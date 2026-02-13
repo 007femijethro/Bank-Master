@@ -20,19 +20,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   if (!user) return <>{children}</>;
 
-  const isAdmin = user.role === 'admin';
+  const isStaff = user.role === 'staff';
 
   const NavContent = () => (
     <div className="flex flex-col h-full py-4">
       <div className="px-6 py-4 mb-6">
         <h1 className="text-2xl font-display font-bold text-primary flex items-center gap-2">
           <ShieldCheck className="w-8 h-8" />
-          SecureBank
+          RFCU
         </h1>
       </div>
 
       <nav className="flex-1 px-4 space-y-2">
-        {isAdmin ? (
+        {isStaff ? (
           <>
             <Link href="/admin">
               <Button 
@@ -41,7 +41,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 onClick={() => setOpen(false)}
               >
                 <Users className="w-4 h-4" />
-                User Management
+                Staff Portal
               </Button>
             </Link>
             <Link href="/admin/logs">
