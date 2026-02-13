@@ -107,7 +107,12 @@ export async function registerRoutes(
 
   app.get("/api/admin/applications", requireStaff, async (req, res) => {
     const apps = await storage.getApplications();
-    res.json(apps);
+    // Attach user info to each application for the staff portal
+    const appsWithUsers = await Promise.all(apps.map(async (app) => {
+      const user = await storage.getUser(app.userId);
+      return { ...app, user };
+    }));
+    res.json(appsWithUsers);
   });
 
   app.patch("/api/admin/applications/:id", requireStaff, async (req, res) => {
@@ -118,6 +123,14 @@ export async function registerRoutes(
   app.post("/api/admin/adjust-balance", requireStaff, async (req, res) => {
     const tx = await storage.adjustBalance(req.body.accountId, req.body.amount, req.body.type, req.user!.id, req.body.reasonCode, req.body.narration);
     res.json(tx);
+  });
+
+  app.patch("/api/user/widgets", requireAuth, async (req, res) => {
+    const user = await db.update(users)
+      .set({ dashboardWidgets: req.body.widgets })
+      .where(eq(users.id, req.user!.id))
+      .returning();
+    res.json(user[0]);
   });
 
   const existingUsers = await storage.getAllUsers();

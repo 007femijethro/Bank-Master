@@ -61,6 +61,13 @@ export default function AdminDashboard() {
           title: `Application ${status === 'approved' ? 'Approved' : 'Rejected'}`,
           description: `The account application has been ${status}.`
         });
+      },
+      onError: (e) => {
+        toast({
+          variant: "destructive",
+          title: "Action Failed",
+          description: e.message
+        });
       }
     });
   };
@@ -215,6 +222,10 @@ export default function AdminDashboard() {
                             <Badge variant={app.status === 'approved' ? 'outline' : app.status === 'pending' ? 'secondary' : 'destructive'}>
                               {app.status}
                             </Badge>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-medium">{app.user?.fullName}</div>
+                            <div className="text-xs text-muted-foreground">{app.user?.email}</div>
                           </td>
                           <td className="p-3 text-right space-x-2">
                             {app.status === 'pending' && (

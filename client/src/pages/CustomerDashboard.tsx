@@ -6,12 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, CreditCard } from "lucide-react";
+import { Plus, Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, CreditCard, Settings2, Check } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { api } from "@shared/routes";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
@@ -20,10 +23,37 @@ export default function CustomerDashboard() {
   const createAccount = useCreateAccount();
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [accountType, setAccountType] = useState<"share_savings" | "checking">("share_savings");
+  
+  const queryClient = useQueryClient();
+  const updateWidgets = useMutation({
+    mutationFn: async (newWidgets: string[]) => {
+      const res = await fetch("/api/user/widgets", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ widgets: newWidgets }),
+      });
+      if (!res.ok) throw new Error("Failed to update widgets");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData([api.auth.me.path], data);
+      toast({ title: "Preferences Saved", description: "Your dashboard layout has been updated." });
+    }
+  });
 
   const totalBalance = accounts?.reduce((sum, acc) => sum + Number(acc.balance), 0) || 0;
   const recentTransactions = transactions?.slice(0, 5) || [];
+
+  const currentWidgets = user?.dashboardWidgets || ["balance", "routing", "activity", "cards"];
+
+  const toggleWidget = (widget: string) => {
+    const newWidgets = currentWidgets.includes(widget)
+      ? currentWidgets.filter(w => w !== widget)
+      : [...currentWidgets, widget];
+    updateWidgets.mutate(newWidgets);
+  };
 
   function handleCreateAccount() {
     createAccount.mutate({ type: accountType }, {
@@ -58,13 +88,47 @@ export default function CustomerDashboard() {
           <p className="text-muted-foreground">Member: {user?.fullName} | Member #: {user?.memberNumber}</p>
         </div>
         
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="shadow-lg shadow-primary/20" disabled={user?.status === 'frozen'}>
-              <Plus className="mr-2 h-4 w-4" /> Apply for Account
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
+        <div className="flex gap-2">
+          <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="icon">
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Customize Dashboard</DialogTitle>
+                <DialogDescription>Choose which widgets you want to see.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                {[
+                  { id: "balance", label: "Total Balance" },
+                  { id: "routing", label: "Routing Number" },
+                  { id: "activity", label: "Recent Activity" },
+                  { id: "cards", label: "Debit/Credit Cards" },
+                ].map((w) => (
+                  <div key={w.id} className="flex items-center space-x-2">
+                    <Checkbox 
+                      id={w.id} 
+                      checked={currentWidgets.includes(w.id)}
+                      onCheckedChange={() => toggleWidget(w.id)}
+                    />
+                    <label htmlFor={w.id} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      {w.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="shadow-lg shadow-primary/20" disabled={user?.status === 'frozen'}>
+                <Plus className="mr-2 h-4 w-4" /> Apply for Account
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
             <DialogHeader>
               <DialogTitle>Account Application</DialogTitle>
               <DialogDescription>Apply for a new Share Savings or Checking account.</DialogDescription>
@@ -93,10 +157,18 @@ export default function CustomerDashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Balance" value={`$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Wallet} className="bg-primary text-primary-foreground border-none" />
-        <StatCard title="Routing #" value="123456789" icon={AlertCircle} className="bg-card" />
-        <StatCard title="Debit Card" value="Active" icon={CreditCard} description="Virtual Card Ready" />
-        <StatCard title="Credit Card" value="N/A" icon={CreditCard} description="Coming Soon" className="opacity-50" />
+        {currentWidgets.includes("balance") && (
+          <StatCard title="Total Balance" value={`$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Wallet} className="bg-primary text-primary-foreground border-none" />
+        )}
+        {currentWidgets.includes("routing") && (
+          <StatCard title="Routing #" value="123456789" icon={AlertCircle} className="bg-card" />
+        )}
+        {currentWidgets.includes("cards") && (
+          <>
+            <StatCard title="Debit Card" value="Active" icon={CreditCard} description="Virtual Card Ready" />
+            <StatCard title="Credit Card" value="N/A" icon={CreditCard} description="Coming Soon" className="opacity-50" />
+          </>
+        )}
       </div>
 
       <div className="grid gap-8 md:grid-cols-2">
@@ -120,35 +192,37 @@ export default function CustomerDashboard() {
           )}
         </div>
 
-        <div className="space-y-4">
-          <h3 className="text-xl font-bold font-display">Recent Activity</h3>
-          <Card>
-            <CardContent className="p-0">
-              {recentTransactions.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground">No transactions.</div>
-              ) : (
-                <div className="divide-y divide-border">
-                  {recentTransactions.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between p-4">
-                      <div className="flex items-center gap-4">
-                        <div className={`p-2 rounded-full ${tx.type.includes('adjustment') ? 'bg-purple-100 text-purple-600' : 'bg-muted'}`}>
-                          {tx.amount.startsWith('-') ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
+        {currentWidgets.includes("activity") && (
+          <div className="space-y-4">
+            <h3 className="text-xl font-bold font-display">Recent Activity</h3>
+            <Card>
+              <CardContent className="p-0">
+                {recentTransactions.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">No transactions.</div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {recentTransactions.map((tx) => (
+                      <div key={tx.id} className="flex items-center justify-between p-4">
+                        <div className="flex items-center gap-4">
+                          <div className={`p-2 rounded-full ${tx.type.includes('adjustment') ? 'bg-purple-100 text-purple-600' : 'bg-muted'}`}>
+                            {tx.amount.startsWith('-') ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm capitalize">{tx.type.replace('_', ' ')}</p>
+                            <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt || new Date()), "MMM d, h:mm a")}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium text-sm capitalize">{tx.type.replace('_', ' ')}</p>
-                          <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt || new Date()), "MMM d, h:mm a")}</p>
+                        <div className={`font-bold text-sm ${tx.type.includes('credit') || tx.type === 'deposit' ? 'text-green-600' : ''}`}>
+                          ${Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </div>
                       </div>
-                      <div className={`font-bold text-sm ${tx.type.includes('credit') || tx.type === 'deposit' ? 'text-green-600' : ''}`}>
-                        ${Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
       <footer className="text-center py-8 text-xs text-muted-foreground border-t">
         RFCU is federally insured by the NCUA up to $250,000.
