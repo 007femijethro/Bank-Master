@@ -155,6 +155,7 @@ export default function CustomerDashboard() {
           </DialogContent>
         </Dialog>
       </div>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {currentWidgets.includes("balance") && (
@@ -205,7 +206,7 @@ export default function CustomerDashboard() {
                       <div key={tx.id} className="flex items-center justify-between p-4">
                         <div className="flex items-center gap-4">
                           <div className={`p-2 rounded-full ${tx.type.includes('adjustment') ? 'bg-purple-100 text-purple-600' : 'bg-muted'}`}>
-                            {tx.amount.startsWith('-') ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
+                            {tx.amount.toString().startsWith('-') ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
                           </div>
                           <div>
                             <p className="font-medium text-sm capitalize">{tx.type.replace('_', ' ')}</p>
