@@ -46,7 +46,7 @@ export default function TransactionPage() {
       narration: narration || "Deposit",
     }, {
       onSuccess: () => {
-        toast({ title: "Deposit Successful", description: `₦${amount} added to your account.` });
+        toast({ title: "Deposit Successful", description: `$${amount} added to your account.` });
         resetForm();
       },
       onError: (e) => toast({ variant: "destructive", title: "Deposit Failed", description: e.message })
@@ -62,7 +62,7 @@ export default function TransactionPage() {
       narration: narration || "Transfer",
     }, {
       onSuccess: () => {
-        toast({ title: "Transfer Successful", description: `₦${amount} sent to ${recipientInfo?.fullName || recipientAccount}.` });
+        toast({ title: "Transfer Successful", description: `$${amount} sent to ${recipientInfo?.fullName || recipientAccount}.` });
         resetForm();
       },
       onError: (e) => toast({ variant: "destructive", title: "Transfer Failed", description: e.message })
@@ -78,7 +78,7 @@ export default function TransactionPage() {
       narration: narration || `Bill Payment - ${billerType}`,
     }, {
       onSuccess: () => {
-        toast({ title: "Payment Successful", description: `Paid ₦${amount} for ${billerType}.` });
+        toast({ title: "Payment Successful", description: `Paid $${amount} for ${billerType}.` });
         resetForm();
       },
       onError: (e) => toast({ variant: "destructive", title: "Payment Failed", description: e.message })
@@ -131,7 +131,7 @@ export default function TransactionPage() {
                   <SelectContent>
                     {accounts?.map((acc) => (
                       <SelectItem key={acc.id} value={String(acc.id)}>
-                        {acc.type} - {acc.accountNumber} (₦{Number(acc.balance).toLocaleString()})
+                        {acc.type.replace('_', ' ')} - {acc.accountNumber} (${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -175,7 +175,7 @@ export default function TransactionPage() {
                   <SelectContent>
                     {accounts?.map((acc) => (
                       <SelectItem key={acc.id} value={String(acc.id)}>
-                        {acc.type} - {acc.accountNumber} (₦{Number(acc.balance).toLocaleString()})
+                        {acc.type.replace('_', ' ')} - {acc.accountNumber} (${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -241,7 +241,7 @@ export default function TransactionPage() {
                   <SelectContent>
                     {accounts?.map((acc) => (
                       <SelectItem key={acc.id} value={String(acc.id)}>
-                        {acc.type} - {acc.accountNumber} (₦{Number(acc.balance).toLocaleString()})
+                        {acc.type.replace('_', ' ')} - {acc.accountNumber} (${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -312,9 +312,9 @@ export default function TransactionPage() {
                           </td>
                           <td className="p-3 font-mono text-xs">{tx.reference}</td>
                           <td className={`p-3 text-right font-bold ${
-                            tx.type === 'deposit' ? 'text-green-600' : 'text-foreground'
+                            tx.type === 'deposit' || tx.type === 'adjustment_credit' ? 'text-green-600' : 'text-foreground'
                           }`}>
-                            {tx.type === 'deposit' ? '+' : '-'}₦{Number(tx.amount).toLocaleString()}
+                            {tx.type === 'deposit' || tx.type === 'adjustment_credit' ? '+' : '-'}${Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </td>
                           <td className="p-3 text-center">
                             <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${

@@ -5,6 +5,9 @@ import { setupAuth } from "./auth";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import passport from "passport";
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -43,7 +46,8 @@ export async function registerRoutes(
   });
 
   app.post(api.auth.logout.path, (req, res, next) => {
-    if (req.user) storage.createAuditLog(req.user.id, "LOGOUT", req.ip);
+    const user = req.user as any;
+    if (user) storage.createAuditLog(user.id, "LOGOUT", req.ip);
     req.logout((err) => {
       if (err) return next(err);
       res.status(200).send();
@@ -51,8 +55,12 @@ export async function registerRoutes(
   });
 
   app.get(api.auth.me.path, (req, res) => {
-    if (req.isAuthenticated()) res.json(req.user);
-    else res.status(401).send();
+    if (req.isAuthenticated()) {
+      const user = req.user as any;
+      res.json(user);
+    } else {
+      res.status(401).send();
+    }
   });
 
   const requireAuth = (req: any, res: any, next: any) => {
@@ -66,15 +74,17 @@ export async function registerRoutes(
   };
 
   app.get(api.accounts.list.path, requireAuth, async (req, res) => {
-    const accounts = await storage.getAccountsByUserId(req.user!.id);
+    const user = req.user as any;
+    const accounts = await storage.getAccountsByUserId(user.id);
     res.json(accounts);
   });
 
   app.post(api.accounts.create.path, requireAuth, async (req, res) => {
     try {
       const input = api.accounts.create.input.parse(req.body);
-      const app = await storage.createApplication({ userId: req.user!.id, type: input.type as any });
-      await storage.createAuditLog(req.user!.id, "APPLY_ACCOUNT", req.ip, { applicationId: app.id });
+      const user = req.user as any;
+      const app = await storage.createApplication({ userId: user.id, type: input.type as any });
+      await storage.createAuditLog(user.id, "APPLY_ACCOUNT", req.ip, { applicationId: app.id });
       res.status(201).json(app);
     } catch (err) { res.status(500).json({ message: "Internal server error" }); }
   });
@@ -82,9 +92,10 @@ export async function registerRoutes(
   app.post(api.transactions.deposit.path, requireAuth, async (req, res) => {
     try {
       const input = api.transactions.deposit.input.parse(req.body);
-      if (req.user!.status === 'frozen') return res.status(403).json({ message: "User is frozen" });
+      const user = req.user as any;
+      if (user.status === 'frozen') return res.status(403).json({ message: "User is frozen" });
       const tx = await storage.deposit(input.accountId, input.amount, input.narration);
-      await storage.createAuditLog(req.user!.id, "DEPOSIT", req.ip, { amount: input.amount });
+      await storage.createAuditLog(user.id, "DEPOSIT", req.ip, { amount: input.amount });
       res.status(201).json(tx);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
   });
@@ -92,11 +103,35 @@ export async function registerRoutes(
   app.post(api.transactions.transfer.path, requireAuth, async (req, res) => {
     try {
       const input = api.transactions.transfer.input.parse(req.body);
-      if (req.user!.status === 'frozen') return res.status(403).json({ message: "User is frozen" });
+      const user = req.user as any;
+      if (user.status === 'frozen') return res.status(403).json({ message: "User is frozen" });
       const tx = await storage.transfer(input.fromAccountId, input.toAccountNumber, input.amount, input.narration);
-      await storage.createAuditLog(req.user!.id, "TRANSFER", req.ip, { amount: input.amount });
+      await storage.createAuditLog(user.id, "TRANSFER", req.ip, { amount: input.amount });
       res.status(201).json(tx);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
+  });
+
+  app.get(api.transactions.list.path, requireAuth, async (req, res) => {
+    try {
+      const accountId = req.query.accountId ? Number(req.query.accountId) : undefined;
+      const user = req.user as any;
+      let txs;
+      if (accountId) {
+        txs = await storage.getTransactionsByAccountId(accountId);
+      } else {
+        // For general history, get all accounts for user first
+        const userAccounts = await storage.getAccountsByUserId(user.id);
+        const allTxs = await Promise.all(
+          userAccounts.map(acc => storage.getTransactionsByAccountId(acc.id))
+        );
+        txs = allTxs.flat().sort((a, b) => 
+          new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+      }
+      res.json(txs);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch transactions" });
+    }
   });
 
   // Admin Routes
@@ -126,11 +161,12 @@ export async function registerRoutes(
   });
 
   app.patch("/api/user/widgets", requireAuth, async (req, res) => {
-    const user = await db.update(users)
+    const user = req.user as any;
+    const updatedUser = await db.update(users)
       .set({ dashboardWidgets: req.body.widgets })
-      .where(eq(users.id, req.user!.id))
+      .where(eq(users.id, user.id))
       .returning();
-    res.json(user[0]);
+    res.json(updatedUser[0]);
   });
 
   const existingUsers = await storage.getAllUsers();

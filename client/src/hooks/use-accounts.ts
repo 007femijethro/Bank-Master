@@ -76,10 +76,11 @@ export function useTransactions(accountId?: number) {
   return useQuery({
     queryKey: [api.transactions.list.path, accountId],
     queryFn: async () => {
-      const url = buildUrl(api.transactions.list.path);
-      // Append query param if accountId exists
-      const finalUrl = accountId ? `${url}?accountId=${accountId}` : url;
-      const res = await fetch(finalUrl);
+      let url = api.transactions.list.path;
+      if (accountId) {
+        url += `?accountId=${accountId}`;
+      }
+      const res = await fetch(url);
       return handleResponse(res, api.transactions.list.responses[200]);
     },
   });
