@@ -162,7 +162,7 @@ export default function CustomerDashboard() {
           <StatCard title="Total Balance" value={`$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Wallet} className="bg-primary text-primary-foreground border-none" />
         )}
         {currentWidgets.includes("routing") && (
-          <StatCard title="Routing #" value="123456789" icon={AlertCircle} className="bg-card" />
+          <StatCard title="Routing #" value="262275835" icon={AlertCircle} className="bg-card" />
         )}
         {currentWidgets.includes("cards") && (
           <>

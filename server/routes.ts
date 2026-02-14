@@ -169,6 +169,15 @@ export async function registerRoutes(
     res.json(updatedUser[0]);
   });
 
+  app.patch("/api/user/profile", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const updatedUser = await db.update(users)
+      .set({ avatarUrl: req.body.avatarUrl, fullName: req.body.fullName, phone: req.body.phone })
+      .where(eq(users.id, user.id as number))
+      .returning();
+    res.json(updatedUser[0]);
+  });
+
   const existingUsers = await storage.getAllUsers();
   if (existingUsers.length === 0) {
     const adminHash = await storage.hashPassword("Admin123!");

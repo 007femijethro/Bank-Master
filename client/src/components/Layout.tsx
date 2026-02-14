@@ -7,16 +7,51 @@ import {
   History, 
   Users, 
   ShieldCheck, 
-  Menu
+  Menu,
+  UserCircle,
+  Camera
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@shared/routes";
+import { useToast } from "@/hooks/use-toast";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || "");
+  const [fullName, setFullName] = useState(user?.fullName || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const updateProfile = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update profile");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData([api.auth.me.path], data);
+      toast({ title: "Profile Updated", description: "Your profile has been successfully updated." });
+      setProfileOpen(false);
+    },
+    onError: (e: any) => {
+      toast({ variant: "destructive", title: "Update Failed", description: e.message });
+    }
+  });
 
   if (!user) return <>{children}</>;
 
@@ -29,6 +64,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <ShieldCheck className="w-8 h-8" />
           RFCU
         </h1>
+        <p className="text-[10px] text-muted-foreground mt-1 font-mono uppercase tracking-wider">
+          Routing: 262275835
+        </p>
       </div>
 
       <nav className="flex-1 px-4 space-y-2">
@@ -82,15 +120,87 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </nav>
 
       <div className="p-4 border-t mt-auto">
-        <div className="flex items-center gap-3 px-2 mb-4">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-            {user.fullName.charAt(0)}
-          </div>
-          <div className="overflow-hidden">
-            <p className="text-sm font-medium truncate">{user.fullName}</p>
-            <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
-          </div>
-        </div>
+        <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+          <DialogTrigger asChild>
+            <button className="w-full flex items-center gap-3 px-2 mb-4 hover:bg-muted/50 p-2 rounded-lg transition-colors text-left group">
+              <Avatar className="w-10 h-10 border-2 border-primary/10 group-hover:border-primary/30 transition-colors">
+                <AvatarImage src={user.avatarUrl || ""} alt={user.fullName} />
+                <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                  {user.fullName.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="overflow-hidden flex-1">
+                <p className="text-sm font-medium truncate">{user.fullName}</p>
+                <p className="text-xs text-muted-foreground capitalize flex items-center gap-1">
+                  {user.role} <UserCircle className="w-3 h-3" />
+                </p>
+              </div>
+            </button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Member Profile</DialogTitle>
+              <DialogDescription>
+                Update your personal information and profile picture.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="flex flex-col items-center gap-4 mb-4">
+                <div className="relative group cursor-pointer" onClick={() => {
+                  const url = window.prompt("Enter Image URL for profile picture:", avatarUrl);
+                  if (url !== null) setAvatarUrl(url);
+                }}>
+                  <Avatar className="w-24 h-24 border-4 border-muted">
+                    <AvatarImage src={avatarUrl} />
+                    <AvatarFallback className="text-2xl">{fullName.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera className="text-white w-6 h-6" />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">Click image to update URL</p>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="name">Full Name</Label>
+                <Input 
+                  id="name" 
+                  value={fullName} 
+                  onChange={(e) => setFullName(e.target.value)} 
+                  placeholder="Your full name"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input 
+                  id="phone" 
+                  value={phone} 
+                  onChange={(e) => setPhone(e.target.value)} 
+                  placeholder="Phone number"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="avatar">Avatar URL</Label>
+                <Input 
+                  id="avatar" 
+                  value={avatarUrl} 
+                  onChange={(e) => setAvatarUrl(e.target.value)} 
+                  placeholder="https://example.com/image.png"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                type="submit" 
+                onClick={() => updateProfile.mutate({ avatarUrl, fullName, phone })}
+                disabled={updateProfile.isPending}
+              >
+                {updateProfile.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Button 
           variant="outline" 
           className="w-full gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
@@ -114,7 +224,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-border p-4 flex items-center justify-between">
         <h1 className="text-xl font-display font-bold text-primary flex items-center gap-2">
           <ShieldCheck className="w-6 h-6" />
-          SecureBank
+          RFCU
         </h1>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>

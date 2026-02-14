@@ -15,6 +15,7 @@ export const users = pgTable("users", {
   status: text("status", { enum: ["active", "frozen"] }).default("active").notNull(),
   memberNumber: text("member_number").unique(),
   dashboardWidgets: jsonb("dashboard_widgets").$type<string[]>().default(["balance", "routing", "activity", "cards"]).notNull(),
+  avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
