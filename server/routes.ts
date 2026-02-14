@@ -156,7 +156,8 @@ export async function registerRoutes(
   });
 
   app.post("/api/admin/adjust-balance", requireStaff, async (req, res) => {
-    const tx = await storage.adjustBalance(req.body.accountId, req.body.amount, req.body.type, req.user!.id, req.body.reasonCode, req.body.narration);
+    const user = req.user as any;
+    const tx = await storage.adjustBalance(req.body.accountId, req.body.amount, req.body.type, user.id, req.body.reasonCode, req.body.narration);
     res.json(tx);
   });
 

@@ -33,6 +33,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Reset local state when user data changes (e.g. after login or update)
+  if (user && fullName === "" && user.fullName) {
+    setFullName(user.fullName);
+    setAvatarUrl(user.avatarUrl || "");
+    setPhone(user.phone || "");
+  }
+
   const updateProfile = useMutation({
     mutationFn: async (data: any) => {
       const res = await fetch("/api/user/profile", {

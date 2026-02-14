@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@shared/routes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
@@ -83,9 +84,17 @@ export default function CustomerDashboard() {
       )}
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-display font-bold text-foreground">RFCU Dashboard</h2>
-          <p className="text-muted-foreground">Member: {user?.fullName} | Member #: {user?.memberNumber}</p>
+        <div className="flex items-center gap-4">
+          <Avatar className="w-12 h-12 border-2 border-primary/10">
+            <AvatarImage src={user?.avatarUrl || ""} alt={user?.fullName} />
+            <AvatarFallback className="bg-primary/10 text-primary font-bold">
+              {user?.fullName?.charAt(0)}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <h2 className="text-3xl font-display font-bold text-foreground">RFCU Dashboard</h2>
+            <p className="text-muted-foreground">Member: {user?.fullName} | Member #: {user?.memberNumber}</p>
+          </div>
         </div>
         
         <div className="flex gap-2">
