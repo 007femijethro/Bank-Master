@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, CreditCard, Settings2, Check } from "lucide-react";
+import { Plus, Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, CreditCard, Settings2, Check, History } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -140,7 +140,7 @@ export default function CustomerDashboard() {
             <DialogContent>
             <DialogHeader>
               <DialogTitle>Account Application</DialogTitle>
-              <DialogDescription>Apply for a new Share Savings or Checking account.</DialogDescription>
+              <DialogDescription>Apply for a new account, loan, or credit line. Applications are reviewed by staff.</DialogDescription>
             </DialogHeader>
             <div className="py-4">
               <RadioGroup value={accountType} onValueChange={(v) => setAccountType(v as any)} className="grid grid-cols-2 md:grid-cols-3 gap-4">

@@ -217,7 +217,10 @@ export default function AdminDashboard() {
                     <tbody>
                       {applications?.map((app) => (
                         <tr key={app.id} className="border-b last:border-0">
-                          <td className="p-3 capitalize">{app.type.replace('_', ' ')}</td>
+                          <td className="p-3">
+                            <div className="font-medium capitalize">{app.type.replace('_', ' ')} Application</div>
+                            <div className="text-xs text-muted-foreground">ID: #{app.id}</div>
+                          </td>
                           <td className="p-3">
                             <Badge variant={app.status === 'approved' ? 'outline' : app.status === 'pending' ? 'secondary' : 'destructive'}>
                               {app.status}
