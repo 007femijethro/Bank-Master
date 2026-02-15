@@ -22,7 +22,7 @@ export const users = pgTable("users", {
 export const accountApplications = pgTable("account_applications", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
-  type: text("type", { enum: ["share_savings", "checking"] }).notNull(),
+  type: text("type", { enum: ["share_savings", "checking", "loan", "home_equity", "credit_card"] }).notNull(),
   status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
   rejectionReason: text("rejection_reason"),
   createdAt: timestamp("created_at").defaultNow(),

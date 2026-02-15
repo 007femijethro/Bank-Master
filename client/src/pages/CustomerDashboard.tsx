@@ -25,7 +25,7 @@ export default function CustomerDashboard() {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [accountType, setAccountType] = useState<"share_savings" | "checking">("share_savings");
+  const [accountType, setAccountType] = useState<"share_savings" | "checking" | "loan" | "home_equity" | "credit_card">("share_savings");
   
   const queryClient = useQueryClient();
   const updateWidgets = useMutation({
@@ -143,17 +143,35 @@ export default function CustomerDashboard() {
               <DialogDescription>Apply for a new Share Savings or Checking account.</DialogDescription>
             </DialogHeader>
             <div className="py-4">
-              <RadioGroup value={accountType} onValueChange={(v) => setAccountType(v as any)} className="grid grid-cols-2 gap-4">
+              <RadioGroup value={accountType} onValueChange={(v) => setAccountType(v as any)} className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <RadioGroupItem value="share_savings" id="share_savings" className="peer sr-only" />
-                  <Label htmlFor="share_savings" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent peer-data-[state=checked]:border-primary">
+                  <Label htmlFor="share_savings" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent peer-data-[state=checked]:border-primary cursor-pointer">
                     <Wallet className="mb-3 h-6 w-6" /> Share Savings
                   </Label>
                 </div>
                 <div>
                   <RadioGroupItem value="checking" id="checking" className="peer sr-only" />
-                  <Label htmlFor="checking" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent peer-data-[state=checked]:border-primary">
+                  <Label htmlFor="checking" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent peer-data-[state=checked]:border-primary cursor-pointer">
                     <RefreshCw className="mb-3 h-6 w-6" /> Checking
+                  </Label>
+                </div>
+                <div>
+                  <RadioGroupItem value="loan" id="loan" className="peer sr-only" />
+                  <Label htmlFor="loan" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent peer-data-[state=checked]:border-primary cursor-pointer">
+                    <ArrowUpRight className="mb-3 h-6 w-6" /> Personal Loan
+                  </Label>
+                </div>
+                <div>
+                  <RadioGroupItem value="home_equity" id="home_equity" className="peer sr-only" />
+                  <Label htmlFor="home_equity" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent peer-data-[state=checked]:border-primary cursor-pointer">
+                    <History className="mb-3 h-6 w-6" /> Home Equity
+                  </Label>
+                </div>
+                <div>
+                  <RadioGroupItem value="credit_card" id="credit_card" className="peer sr-only" />
+                  <Label htmlFor="credit_card" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent peer-data-[state=checked]:border-primary cursor-pointer">
+                    <CreditCard className="mb-3 h-6 w-6" /> Credit Card
                   </Label>
                 </div>
               </RadioGroup>
