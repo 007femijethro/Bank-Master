@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, UserX, UserCheck, ShieldAlert, Check, X, DollarSign } from "lucide-react";
+import { Loader2, UserX, UserCheck, ShieldAlert, Check, X, DollarSign, Smartphone, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -24,12 +25,39 @@ export default function AdminDashboard() {
   const updateApplication = useUpdateApplication();
   const adjustBalance = useAdjustBalance();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustType, setAdjustType] = useState<"adjustment_credit" | "adjustment_debit">("adjustment_credit");
   const [adjustReason, setAdjustReason] = useState("");
+  const [formDataDialog, setFormDataDialog] = useState<any>(null);
+
+  const { data: mobileDeposits, isLoading: loadingDeposits } = useQuery({
+    queryKey: ["/api/admin/mobile-deposits"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/mobile-deposits");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const reviewDeposit = useMutation({
+    mutationFn: async ({ id, status, reason }: { id: number; status: string; reason?: string }) => {
+      const res = await fetch(`/api/admin/mobile-deposits/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, reason }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/mobile-deposits"] });
+      toast({ title: "Deposit Reviewed", description: "Mobile deposit has been processed." });
+    },
+  });
 
   if (user?.role !== 'staff') {
     return <Redirect to="/dashboard" />;
@@ -45,11 +73,7 @@ export default function AdminDashboard() {
         });
       },
       onError: (e) => {
-        toast({
-          variant: "destructive",
-          title: "Update Failed",
-          description: e.message
-        });
+        toast({ variant: "destructive", title: "Update Failed", description: e.message });
       }
     });
   };
@@ -59,15 +83,11 @@ export default function AdminDashboard() {
       onSuccess: () => {
         toast({
           title: `Application ${status === 'approved' ? 'Approved' : 'Rejected'}`,
-          description: `The account application has been ${status}.`
+          description: `The application has been ${status}.`
         });
       },
       onError: (e) => {
-        toast({
-          variant: "destructive",
-          title: "Action Failed",
-          description: e.message
-        });
+        toast({ variant: "destructive", title: "Action Failed", description: e.message });
       }
     });
   };
@@ -93,18 +113,37 @@ export default function AdminDashboard() {
     });
   };
 
+  const renderFormData = (formData: any) => {
+    if (!formData) return null;
+    return Object.entries(formData).map(([key, value]) => (
+      <div key={key} className="flex justify-between text-sm py-1">
+        <span className="text-muted-foreground capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+        <span className="font-medium">{String(value)}</span>
+      </div>
+    ));
+  };
+
   return (
     <div className="space-y-8">
       <div>
         <h2 className="text-3xl font-display font-bold text-foreground">Staff Portal</h2>
-        <p className="text-muted-foreground">Manage members, applications, and account adjustments</p>
+        <p className="text-muted-foreground">Manage members, applications, mobile deposits, and account adjustments</p>
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="users">Members</TabsTrigger>
-          <TabsTrigger value="applications">Applications</TabsTrigger>
-          <TabsTrigger value="logs">Audit Logs</TabsTrigger>
+          <TabsTrigger value="users" data-testid="tab-admin-users">Members</TabsTrigger>
+          <TabsTrigger value="applications" data-testid="tab-admin-apps">Applications
+            {applications?.filter((a: any) => a.status === 'pending').length ? (
+              <Badge variant="destructive" className="ml-2">{applications.filter((a: any) => a.status === 'pending').length}</Badge>
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="deposits" data-testid="tab-admin-deposits">Mobile Deposits
+            {mobileDeposits?.filter((d: any) => d.status === 'pending').length ? (
+              <Badge variant="destructive" className="ml-2">{mobileDeposits.filter((d: any) => d.status === 'pending').length}</Badge>
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="logs" data-testid="tab-admin-logs">Audit Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -141,7 +180,7 @@ export default function AdminDashboard() {
                           <td className="p-3 text-right space-x-2">
                             <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
                               <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" onClick={() => setSelectedAccountId(u.id)}>
+                                <Button variant="outline" size="sm" onClick={() => setSelectedAccountId(u.id)} data-testid={`button-adjust-${u.id}`}>
                                   <DollarSign className="w-4 h-4 mr-1" /> Adjust
                                 </Button>
                               </DialogTrigger>
@@ -171,7 +210,7 @@ export default function AdminDashboard() {
                                   </div>
                                 </div>
                                 <DialogFooter>
-                                  <Button onClick={handleAdjustBalance}>Apply Adjustment</Button>
+                                  <Button onClick={handleAdjustBalance} data-testid="button-apply-adjustment">Apply Adjustment</Button>
                                 </DialogFooter>
                               </DialogContent>
                             </Dialog>
@@ -180,6 +219,7 @@ export default function AdminDashboard() {
                                 variant={u.status === 'active' ? "destructive" : "outline"} 
                                 size="sm"
                                 onClick={() => handleStatusToggle(u.id, u.status)}
+                                data-testid={`button-toggle-status-${u.id}`}
                               >
                                 {u.status === 'active' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                               </Button>
@@ -198,8 +238,8 @@ export default function AdminDashboard() {
         <TabsContent value="applications">
           <Card>
             <CardHeader>
-              <CardTitle>Account Applications</CardTitle>
-              <CardDescription>Review and approve new account requests.</CardDescription>
+              <CardTitle>Account & Product Applications</CardTitle>
+              <CardDescription>Review accounts, loans, home equity, and credit card applications.</CardDescription>
             </CardHeader>
             <CardContent>
               {loadingApps ? (
@@ -209,17 +249,22 @@ export default function AdminDashboard() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
+                        <th className="p-3 text-left font-medium">Applicant</th>
                         <th className="p-3 text-left font-medium">Type</th>
                         <th className="p-3 text-left font-medium">Status</th>
+                        <th className="p-3 text-left font-medium">Details</th>
                         <th className="p-3 text-right font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {applications?.map((app) => (
+                      {applications?.map((app: any) => (
                         <tr key={app.id} className="border-b last:border-0">
                           <td className="p-3">
-                            <div className="font-medium capitalize">{app.type.replace('_', ' ')} Application</div>
-                            <div className="text-xs text-muted-foreground">ID: #{app.id}</div>
+                            <div className="font-medium">{app.user?.fullName}</div>
+                            <div className="text-xs text-muted-foreground">{app.user?.email}</div>
+                          </td>
+                          <td className="p-3">
+                            <Badge variant="outline" className="capitalize">{app.type.replace('_', ' ')}</Badge>
                           </td>
                           <td className="p-3">
                             <Badge variant={app.status === 'approved' ? 'outline' : app.status === 'pending' ? 'secondary' : 'destructive'}>
@@ -227,16 +272,95 @@ export default function AdminDashboard() {
                             </Badge>
                           </td>
                           <td className="p-3">
-                            <div className="font-medium">{app.user?.fullName}</div>
-                            <div className="text-xs text-muted-foreground">{app.user?.email}</div>
+                            {app.formData && (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="ghost" size="sm" data-testid={`button-view-details-${app.id}`}>
+                                    <Eye className="w-4 h-4 mr-1" /> View Details
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-md">
+                                  <DialogHeader>
+                                    <DialogTitle className="capitalize">{app.type.replace('_', ' ')} Application Details</DialogTitle>
+                                    <DialogDescription>Submitted by {app.user?.fullName}</DialogDescription>
+                                  </DialogHeader>
+                                  <div className="space-y-1 py-4 divide-y">
+                                    {renderFormData(app.formData)}
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                            )}
+                            {!app.formData && <span className="text-xs text-muted-foreground">No additional details</span>}
                           </td>
                           <td className="p-3 text-right space-x-2">
                             {app.status === 'pending' && (
                               <>
-                                <Button size="sm" variant="outline" onClick={() => handleAppAction(app.id, 'approved')}>
+                                <Button size="sm" variant="outline" onClick={() => handleAppAction(app.id, 'approved')} data-testid={`button-approve-app-${app.id}`}>
                                   <Check className="w-4 h-4 mr-1" /> Approve
                                 </Button>
-                                <Button size="sm" variant="destructive" onClick={() => handleAppAction(app.id, 'rejected')}>
+                                <Button size="sm" variant="destructive" onClick={() => handleAppAction(app.id, 'rejected')} data-testid={`button-reject-app-${app.id}`}>
+                                  <X className="w-4 h-4 mr-1" /> Reject
+                                </Button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="deposits">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Smartphone className="w-5 h-5" /> Mobile Deposit Review</CardTitle>
+              <CardDescription>Review and approve pending mobile check deposits.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingDeposits ? (
+                <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>
+              ) : !mobileDeposits?.length ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Smartphone className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                  <p>No mobile deposits to review.</p>
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="p-3 text-left font-medium">Member</th>
+                        <th className="p-3 text-left font-medium">Amount</th>
+                        <th className="p-3 text-left font-medium">Date</th>
+                        <th className="p-3 text-left font-medium">Status</th>
+                        <th className="p-3 text-right font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mobileDeposits.map((dep: any) => (
+                        <tr key={dep.id} className="border-b last:border-0">
+                          <td className="p-3">
+                            <div className="font-medium">{dep.user?.fullName}</div>
+                            <div className="text-xs text-muted-foreground">{dep.user?.email}</div>
+                          </td>
+                          <td className="p-3 font-medium">${Number(dep.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                          <td className="p-3 text-muted-foreground text-xs">{dep.createdAt ? format(new Date(dep.createdAt), "MMM d, yyyy h:mm a") : "N/A"}</td>
+                          <td className="p-3">
+                            <Badge variant={dep.status === 'approved' ? 'outline' : dep.status === 'pending' ? 'secondary' : 'destructive'}>
+                              {dep.status}
+                            </Badge>
+                          </td>
+                          <td className="p-3 text-right space-x-2">
+                            {dep.status === 'pending' && (
+                              <>
+                                <Button size="sm" variant="outline" onClick={() => reviewDeposit.mutate({ id: dep.id, status: "approved" })} data-testid={`button-approve-deposit-${dep.id}`}>
+                                  <Check className="w-4 h-4 mr-1" /> Approve
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={() => reviewDeposit.mutate({ id: dep.id, status: "rejected", reason: "Check not valid" })} data-testid={`button-reject-deposit-${dep.id}`}>
                                   <X className="w-4 h-4 mr-1" /> Reject
                                 </Button>
                               </>

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertUserSchema, users, accounts, transactions, auditLogs, accountApplications } from './schema';
+import { insertUserSchema, users, accounts, transactions, auditLogs, accountApplications, mobileDeposits, cryptoHoldings } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -72,7 +72,10 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/accounts' as const,
-      input: z.object({ type: z.enum(["share_savings", "checking"]) }),
+      input: z.object({
+        type: z.enum(["share_savings", "checking", "loan", "home_equity", "credit_card"]),
+        formData: z.record(z.any()).optional(),
+      }),
       responses: {
         201: z.custom<typeof accountApplications.$inferSelect>(),
         400: errorSchemas.validation,
@@ -138,6 +141,67 @@ export const api = {
       },
     },
   },
+  mobileDeposit: {
+    create: {
+      method: 'POST' as const,
+      path: '/api/mobile-deposit' as const,
+      input: z.object({
+        accountId: z.number(),
+        amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
+        checkFrontUrl: z.string().min(1),
+        checkBackUrl: z.string().optional(),
+      }),
+      responses: {
+        201: z.custom<typeof mobileDeposits.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    list: {
+      method: 'GET' as const,
+      path: '/api/mobile-deposits' as const,
+      responses: {
+        200: z.array(z.custom<typeof mobileDeposits.$inferSelect>()),
+      },
+    },
+  },
+  crypto: {
+    holdings: {
+      method: 'GET' as const,
+      path: '/api/crypto/holdings' as const,
+      responses: {
+        200: z.array(z.custom<typeof cryptoHoldings.$inferSelect>()),
+      },
+    },
+    buy: {
+      method: 'POST' as const,
+      path: '/api/crypto/buy' as const,
+      input: z.object({
+        symbol: z.string(),
+        name: z.string(),
+        amountUsd: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
+        cryptoAmount: z.string(),
+        accountId: z.number(),
+      }),
+      responses: {
+        201: z.custom<typeof cryptoHoldings.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    sell: {
+      method: 'POST' as const,
+      path: '/api/crypto/sell' as const,
+      input: z.object({
+        holdingId: z.number(),
+        amountCrypto: z.string(),
+        usdAmount: z.string(),
+        accountId: z.number(),
+      }),
+      responses: {
+        200: z.custom<typeof cryptoHoldings.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+  },
   admin: {
     users: {
       method: 'GET' as const,
@@ -196,8 +260,27 @@ export const api = {
         403: errorSchemas.forbidden,
       },
     },
+    mobileDeposits: {
+      method: 'GET' as const,
+      path: '/api/admin/mobile-deposits' as const,
+      responses: {
+        200: z.array(z.custom<typeof mobileDeposits.$inferSelect>()),
+        403: errorSchemas.forbidden,
+      },
+    },
+    reviewMobileDeposit: {
+      method: 'PATCH' as const,
+      path: '/api/admin/mobile-deposits/:id' as const,
+      input: z.object({ status: z.enum(["approved", "rejected"]), reason: z.string().optional() }),
+      responses: {
+        200: z.custom<typeof mobileDeposits.$inferSelect>(),
+        403: errorSchemas.forbidden,
+      },
+    },
   },
 };
+
+export type CreateAccountRequest = z.infer<typeof api.accounts.create.input>;
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {
   let url = path;

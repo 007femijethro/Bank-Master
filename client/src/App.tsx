@@ -8,6 +8,9 @@ import AuthPage from "@/pages/AuthPage";
 import CustomerDashboard from "@/pages/CustomerDashboard";
 import TransactionPage from "@/pages/TransactionPage";
 import AdminDashboard from "@/pages/AdminDashboard";
+import ApplyPage from "@/pages/ApplyPage";
+import CryptoPage from "@/pages/CryptoPage";
+import MobileDepositPage from "@/pages/MobileDepositPage";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
@@ -43,15 +46,22 @@ function Router() {
     <Switch>
       <Route path="/" component={AuthPage} />
       
-      {/* Customer Routes */}
       <Route path="/dashboard">
         <ProtectedRoute component={CustomerDashboard} />
       </Route>
       <Route path="/transactions">
         <ProtectedRoute component={TransactionPage} />
       </Route>
+      <Route path="/apply">
+        <ProtectedRoute component={ApplyPage} />
+      </Route>
+      <Route path="/crypto">
+        <ProtectedRoute component={CryptoPage} />
+      </Route>
+      <Route path="/mobile-deposit">
+        <ProtectedRoute component={MobileDepositPage} />
+      </Route>
 
-      {/* Admin Routes */}
       <Route path="/admin">
         <ProtectedRoute component={AdminDashboard} adminOnly />
       </Route>

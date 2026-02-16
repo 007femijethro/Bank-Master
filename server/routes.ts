@@ -9,6 +9,15 @@ import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
+const SIMULATED_PRICES: Record<string, number> = {
+  BTC: 97284.50, ETH: 3642.80, SOL: 178.45, ADA: 0.87,
+  DOT: 8.92, LINK: 22.15, XRP: 2.34, DOGE: 0.32,
+};
+
+function getSimulatedPrice(symbol: string): number | null {
+  return SIMULATED_PRICES[symbol] || null;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -83,10 +92,13 @@ export async function registerRoutes(
     try {
       const input = api.accounts.create.input.parse(req.body);
       const user = req.user as any;
-      const app = await storage.createApplication({ userId: user.id, type: input.type as any });
-      await storage.createAuditLog(user.id, "APPLY_ACCOUNT", req.ip, { applicationId: app.id });
-      res.status(201).json(app);
-    } catch (err) { res.status(500).json({ message: "Internal server error" }); }
+      const application = await storage.createApplication({ userId: user.id, type: input.type as any, formData: input.formData || null });
+      await storage.createAuditLog(user.id, "APPLY_ACCOUNT", req.ip, { applicationId: application.id, type: input.type });
+      res.status(201).json(application);
+    } catch (err: any) {
+      console.error("Application create error:", err);
+      res.status(500).json({ message: err.message || "Internal server error" });
+    }
   });
 
   app.post(api.transactions.deposit.path, requireAuth, async (req, res) => {
@@ -119,7 +131,6 @@ export async function registerRoutes(
       if (accountId) {
         txs = await storage.getTransactionsByAccountId(accountId);
       } else {
-        // For general history, get all accounts for user first
         const userAccounts = await storage.getAccountsByUserId(user.id);
         const allTxs = await Promise.all(
           userAccounts.map(acc => storage.getTransactionsByAccountId(acc.id))
@@ -134,15 +145,88 @@ export async function registerRoutes(
     }
   });
 
+  // Mobile Deposit
+  app.post(api.mobileDeposit.create.path, requireAuth, async (req, res) => {
+    try {
+      const input = api.mobileDeposit.create.input.parse(req.body);
+      const user = req.user as any;
+      if (user.status === 'frozen') return res.status(403).json({ message: "Account is frozen" });
+      const account = await storage.getAccount(input.accountId);
+      if (!account || account.userId !== user.id) return res.status(403).json({ message: "Account not found or not owned by you" });
+      const deposit = await storage.createMobileDeposit(user.id, input.accountId, input.amount, input.checkFrontUrl, input.checkBackUrl);
+      await storage.createAuditLog(user.id, "MOBILE_DEPOSIT_SUBMIT", req.ip, { amount: input.amount });
+      res.status(201).json(deposit);
+    } catch (err: any) { res.status(400).json({ message: err.message }); }
+  });
+
+  app.get(api.mobileDeposit.list.path, requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const deposits = await storage.getMobileDepositsByUserId(user.id);
+    res.json(deposits);
+  });
+
+  // Crypto
+  app.get(api.crypto.holdings.path, requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const holdings = await storage.getCryptoHoldingsByUserId(user.id);
+    res.json(holdings);
+  });
+
+  app.post(api.crypto.buy.path, requireAuth, async (req, res) => {
+    try {
+      const input = api.crypto.buy.input.parse(req.body);
+      const user = req.user as any;
+      if (user.status === 'frozen') return res.status(403).json({ message: "Account is frozen" });
+      const account = await storage.getAccount(input.accountId);
+      if (!account || account.userId !== user.id) return res.status(403).json({ message: "Account not found or not owned by you" });
+      const price = getSimulatedPrice(input.symbol);
+      if (!price) return res.status(400).json({ message: "Unsupported cryptocurrency" });
+      const serverCryptoAmount = (parseFloat(input.amountUsd) / price).toFixed(8);
+      const holding = await storage.buyCrypto(user.id, input.symbol, input.name, serverCryptoAmount, input.amountUsd, input.accountId);
+      await storage.createAuditLog(user.id, "CRYPTO_BUY", req.ip, { symbol: input.symbol, amountUsd: input.amountUsd, cryptoAmount: serverCryptoAmount });
+      res.status(201).json(holding);
+    } catch (err: any) { res.status(400).json({ message: err.message }); }
+  });
+
+  app.post(api.crypto.sell.path, requireAuth, async (req, res) => {
+    try {
+      const input = api.crypto.sell.input.parse(req.body);
+      const user = req.user as any;
+      if (user.status === 'frozen') return res.status(403).json({ message: "Account is frozen" });
+      const account = await storage.getAccount(input.accountId);
+      if (!account || account.userId !== user.id) return res.status(403).json({ message: "Account not found or not owned by you" });
+      const holdings = await storage.getCryptoHoldingsByUserId(user.id);
+      const holding = holdings.find(h => h.id === input.holdingId);
+      if (!holding) return res.status(403).json({ message: "Holding not found or not owned by you" });
+      const price = getSimulatedPrice(holding.symbol);
+      if (!price) return res.status(400).json({ message: "Unsupported cryptocurrency" });
+      const serverUsdAmount = (parseFloat(input.amountCrypto) * price).toFixed(2);
+      const updated = await storage.sellCrypto(input.holdingId, input.amountCrypto, serverUsdAmount, input.accountId);
+      await storage.createAuditLog(user.id, "CRYPTO_SELL", req.ip, { holdingId: input.holdingId, usdAmount: serverUsdAmount });
+      res.status(200).json(updated);
+    } catch (err: any) { res.status(400).json({ message: err.message }); }
+  });
+
+  // Bill Pay
+  app.post(api.transactions.billpay.path, requireAuth, async (req, res) => {
+    try {
+      const input = api.transactions.billpay.input.parse(req.body);
+      const user = req.user as any;
+      if (user.status === 'frozen') return res.status(403).json({ message: "User is frozen" });
+      const tx = await storage.billpay(input.fromAccountId, input.billerType, input.amount, input.narration);
+      await storage.createAuditLog(user.id, "BILL_PAY", req.ip, { amount: input.amount });
+      res.status(201).json(tx);
+    } catch (err: any) { res.status(400).json({ message: err.message }); }
+  });
+
   // Admin Routes
   app.get(api.admin.users.path, requireStaff, async (req, res) => {
-    const users = await storage.getAllUsers();
-    res.json(users);
+    const allUsers = await storage.getAllUsers();
+    res.json(allUsers);
   });
 
   app.get("/api/admin/applications", requireStaff, async (req, res) => {
     const apps = await storage.getApplications();
-    // Attach user info to each application for the staff portal
     const appsWithUsers = await Promise.all(apps.map(async (app) => {
       const user = await storage.getUser(app.userId);
       return { ...app, user };
@@ -161,6 +245,25 @@ export async function registerRoutes(
     res.json(tx);
   });
 
+  app.get(api.admin.mobileDeposits.path, requireStaff, async (req, res) => {
+    const deposits = await storage.getAllMobileDeposits();
+    const depositsWithUsers = await Promise.all(deposits.map(async (d) => {
+      const user = await storage.getUser(d.userId);
+      return { ...d, user };
+    }));
+    res.json(depositsWithUsers);
+  });
+
+  app.patch("/api/admin/mobile-deposits/:id", requireStaff, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const deposit = await storage.reviewMobileDeposit(Number(req.params.id), req.body.status, user.id, req.body.reason);
+      await storage.createAuditLog(user.id, `MOBILE_DEPOSIT_${req.body.status.toUpperCase()}`, req.ip, { depositId: deposit.id });
+      res.json(deposit);
+    } catch (err: any) { res.status(400).json({ message: err.message }); }
+  });
+
+  // User profile/widget routes
   app.patch("/api/user/widgets", requireAuth, async (req, res) => {
     const user = req.user as any;
     const updatedUser = await db.update(users)
@@ -179,10 +282,22 @@ export async function registerRoutes(
     res.json(updatedUser[0]);
   });
 
-  const existingUsers = await storage.getAllUsers();
-  if (existingUsers.length === 0) {
+  // Member applications list
+  app.get("/api/my-applications", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const apps = await storage.getApplicationsByUserId(user.id);
+    res.json(apps);
+  });
+
+  // Seed data
+  const staffUser = await storage.getUserByUsername("staff@demo.com");
+  if (!staffUser) {
     const adminHash = await storage.hashPassword("Admin123!");
     await storage.createUser({ email: "staff@demo.com", password: adminHash, fullName: "CU Staff", role: "staff", status: "active", phone: "0000000000" });
+  }
+  const adminUser = await storage.getUserByUsername("admin@demo.com");
+  if (!adminUser) {
+    const adminHash = await storage.hashPassword("Admin123!");
     await storage.createUser({ email: "admin@demo.com", password: adminHash, fullName: "Admin User", role: "staff", status: "active", phone: "0000000000" });
   }
 

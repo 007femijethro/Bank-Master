@@ -25,6 +25,7 @@ export const accountApplications = pgTable("account_applications", {
   type: text("type", { enum: ["share_savings", "checking", "loan", "home_equity", "credit_card"] }).notNull(),
   status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
   rejectionReason: text("rejection_reason"),
+  formData: jsonb("form_data").$type<Record<string, any>>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -42,7 +43,7 @@ export const accounts = pgTable("accounts", {
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   reference: text("reference").notNull().unique(),
-  type: text("type", { enum: ["deposit", "transfer", "billpay", "adjustment_credit", "adjustment_debit"] }).notNull(),
+  type: text("type", { enum: ["deposit", "transfer", "billpay", "adjustment_credit", "adjustment_debit", "mobile_deposit"] }).notNull(),
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
   fromAccountId: integer("from_account_id"),
   toAccountId: integer("to_account_id"),
@@ -50,6 +51,28 @@ export const transactions = pgTable("transactions", {
   reasonCode: text("reason_code"),
   staffUserId: integer("staff_user_id"),
   status: text("status", { enum: ["pending", "success", "failed"] }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const mobileDeposits = pgTable("mobile_deposits", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  checkFrontUrl: text("check_front_url").notNull(),
+  checkBackUrl: text("check_back_url"),
+  status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
+  reviewedBy: integer("reviewed_by"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const cryptoHoldings = pgTable("crypto_holdings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  symbol: text("symbol").notNull(),
+  name: text("name").notNull(),
+  amount: decimal("amount", { precision: 18, scale: 8 }).default("0").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -68,6 +91,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
   applications: many(accountApplications),
   auditLogs: many(auditLogs),
+  mobileDeposits: many(mobileDeposits),
+  cryptoHoldings: many(cryptoHoldings),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -99,6 +124,24 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
   }),
 }));
 
+export const mobileDepositsRelations = relations(mobileDeposits, ({ one }) => ({
+  user: one(users, {
+    fields: [mobileDeposits.userId],
+    references: [users.id],
+  }),
+  account: one(accounts, {
+    fields: [mobileDeposits.accountId],
+    references: [accounts.id],
+  }),
+}));
+
+export const cryptoHoldingsRelations = relations(cryptoHoldings, ({ one }) => ({
+  user: one(users, {
+    fields: [cryptoHoldings.userId],
+    references: [users.id],
+  }),
+}));
+
 // === BASE SCHEMAS ===
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memberNumber: true });
@@ -112,6 +155,8 @@ export type Account = typeof accounts.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type AccountApplication = typeof accountApplications.$inferSelect;
+export type MobileDeposit = typeof mobileDeposits.$inferSelect;
+export type CryptoHolding = typeof cryptoHoldings.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertApplication = z.infer<typeof insertApplicationSchema>;

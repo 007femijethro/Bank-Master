@@ -1,45 +1,48 @@
-import { users, accounts, transactions, auditLogs, accountApplications, type User, type InsertUser, type Account, type Transaction, type AuditLog, type AccountApplication, type InsertApplication } from "@shared/schema";
+import { users, accounts, transactions, auditLogs, accountApplications, mobileDeposits, cryptoHoldings, type User, type InsertUser, type Account, type Transaction, type AuditLog, type AccountApplication, type InsertApplication, type MobileDeposit, type CryptoHolding } from "@shared/schema";
 import { db } from "./db";
-import { eq, or, desc, sql } from "drizzle-orm";
+import { eq, or, desc, sql, and } from "drizzle-orm";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 
 const scryptAsync = promisify(scrypt);
 
 export interface IStorage {
-  // User
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserStatus(id: number, status: "active" | "frozen"): Promise<User>;
   getAllUsers(): Promise<User[]>;
 
-  // Account
   getAccount(id: number): Promise<Account | undefined>;
   getAccountByNumber(accountNumber: string): Promise<Account | undefined>;
   getAccountsByUserId(userId: number): Promise<Account[]>;
   createAccount(userId: number, type: "share_savings" | "checking"): Promise<Account>;
   
-  // Applications
   createApplication(app: InsertApplication & { userId: number }): Promise<AccountApplication>;
   getApplications(): Promise<AccountApplication[]>;
+  getApplicationsByUserId(userId: number): Promise<AccountApplication[]>;
   updateApplicationStatus(id: number, status: "approved" | "rejected", reason?: string): Promise<AccountApplication>;
 
-  // Transaction
   getTransactionsByAccountId(accountId: number): Promise<Transaction[]>;
   getAllTransactions(): Promise<Transaction[]>;
   
-  // Operations
   deposit(accountId: number, amount: string, narration?: string): Promise<Transaction>;
   transfer(fromAccountId: number, toAccountNumber: string, amount: string, narration?: string): Promise<Transaction>;
   billpay(fromAccountId: number, billerType: string, amount: string, narration?: string): Promise<Transaction>;
   adjustBalance(accountId: number, amount: string, type: "adjustment_credit" | "adjustment_debit", staffUserId: number, reasonCode: string, narration?: string): Promise<Transaction>;
 
-  // Audit
+  createMobileDeposit(userId: number, accountId: number, amount: string, checkFrontUrl: string, checkBackUrl?: string): Promise<MobileDeposit>;
+  getMobileDepositsByUserId(userId: number): Promise<MobileDeposit[]>;
+  getAllMobileDeposits(): Promise<MobileDeposit[]>;
+  reviewMobileDeposit(id: number, status: "approved" | "rejected", reviewedBy: number, reason?: string): Promise<MobileDeposit>;
+
+  getCryptoHoldingsByUserId(userId: number): Promise<CryptoHolding[]>;
+  buyCrypto(userId: number, symbol: string, name: string, cryptoAmount: string, usdAmount: string, accountId: number): Promise<CryptoHolding>;
+  sellCrypto(holdingId: number, cryptoAmount: string, usdAmount: string, accountId: number): Promise<CryptoHolding>;
+
   createAuditLog(actorUserId: number | undefined, action: string, ipAddress?: string, metadata?: any): Promise<AuditLog>;
   getAuditLogs(): Promise<AuditLog[]>;
 
-  // Auth Helpers
   hashPassword(password: string): Promise<string>;
   comparePasswords(supplied: string, stored: string): Promise<boolean>;
 }
@@ -113,6 +116,10 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(accountApplications).orderBy(desc(accountApplications.createdAt));
   }
 
+  async getApplicationsByUserId(userId: number): Promise<AccountApplication[]> {
+    return await db.select().from(accountApplications).where(eq(accountApplications.userId, userId)).orderBy(desc(accountApplications.createdAt));
+  }
+
   async updateApplicationStatus(id: number, status: "approved" | "rejected", reason?: string): Promise<AccountApplication> {
     return await db.transaction(async (tx) => {
       const [app] = await tx.update(accountApplications)
@@ -120,7 +127,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(accountApplications.id, id))
         .returning();
       
-      if (status === "approved") {
+      if (status === "approved" && (app.type === "share_savings" || app.type === "checking")) {
         await this.createAccount(app.userId, app.type as any);
       }
       return app;
@@ -223,6 +230,127 @@ export class DatabaseStorage implements IStorage {
         status: "success"
       }).returning();
       return transaction;
+    });
+  }
+
+  async createMobileDeposit(userId: number, accountId: number, amount: string, checkFrontUrl: string, checkBackUrl?: string): Promise<MobileDeposit> {
+    const [deposit] = await db.insert(mobileDeposits).values({
+      userId,
+      accountId,
+      amount,
+      checkFrontUrl,
+      checkBackUrl: checkBackUrl || null,
+      status: "pending"
+    }).returning();
+    return deposit;
+  }
+
+  async getMobileDepositsByUserId(userId: number): Promise<MobileDeposit[]> {
+    return await db.select().from(mobileDeposits).where(eq(mobileDeposits.userId, userId)).orderBy(desc(mobileDeposits.createdAt));
+  }
+
+  async getAllMobileDeposits(): Promise<MobileDeposit[]> {
+    return await db.select().from(mobileDeposits).orderBy(desc(mobileDeposits.createdAt));
+  }
+
+  async reviewMobileDeposit(id: number, status: "approved" | "rejected", reviewedBy: number, reason?: string): Promise<MobileDeposit> {
+    return await db.transaction(async (tx) => {
+      const [deposit] = await tx.update(mobileDeposits)
+        .set({ status, reviewedBy, rejectionReason: reason })
+        .where(eq(mobileDeposits.id, id))
+        .returning();
+
+      if (status === "approved") {
+        const [account] = await tx.select().from(accounts).where(eq(accounts.id, deposit.accountId));
+        if (account) {
+          const newBalance = (parseFloat(account.balance) + parseFloat(deposit.amount)).toFixed(2);
+          await tx.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, deposit.accountId));
+          await tx.insert(transactions).values({
+            reference: `MDEP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            type: "mobile_deposit",
+            amount: deposit.amount,
+            toAccountId: deposit.accountId,
+            narration: "Mobile Check Deposit",
+            staffUserId: reviewedBy,
+            status: "success"
+          });
+        }
+      }
+      return deposit;
+    });
+  }
+
+  async getCryptoHoldingsByUserId(userId: number): Promise<CryptoHolding[]> {
+    return await db.select().from(cryptoHoldings).where(eq(cryptoHoldings.userId, userId));
+  }
+
+  async buyCrypto(userId: number, symbol: string, name: string, cryptoAmount: string, usdAmount: string, accountId: number): Promise<CryptoHolding> {
+    return await db.transaction(async (tx) => {
+      const [account] = await tx.select().from(accounts).where(eq(accounts.id, accountId));
+      if (!account) throw new Error("Account not found");
+      if (parseFloat(account.balance) < parseFloat(usdAmount)) throw new Error("Insufficient funds");
+
+      const newBalance = (parseFloat(account.balance) - parseFloat(usdAmount)).toFixed(2);
+      await tx.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, accountId));
+
+      await tx.insert(transactions).values({
+        reference: `CRYPTO-BUY-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        type: "billpay",
+        amount: usdAmount,
+        fromAccountId: accountId,
+        narration: `Buy ${cryptoAmount} ${symbol}`,
+        status: "success"
+      });
+
+      const existing = await tx.select().from(cryptoHoldings)
+        .where(and(eq(cryptoHoldings.userId, userId), eq(cryptoHoldings.symbol, symbol)));
+
+      if (existing.length > 0) {
+        const newAmount = (parseFloat(existing[0].amount) + parseFloat(cryptoAmount)).toFixed(8);
+        const [updated] = await tx.update(cryptoHoldings)
+          .set({ amount: newAmount })
+          .where(eq(cryptoHoldings.id, existing[0].id))
+          .returning();
+        return updated;
+      } else {
+        const [holding] = await tx.insert(cryptoHoldings).values({
+          userId,
+          symbol,
+          name,
+          amount: cryptoAmount
+        }).returning();
+        return holding;
+      }
+    });
+  }
+
+  async sellCrypto(holdingId: number, cryptoAmount: string, usdAmount: string, accountId: number): Promise<CryptoHolding> {
+    return await db.transaction(async (tx) => {
+      const [holding] = await tx.select().from(cryptoHoldings).where(eq(cryptoHoldings.id, holdingId));
+      if (!holding) throw new Error("Holding not found");
+      if (parseFloat(holding.amount) < parseFloat(cryptoAmount)) throw new Error("Insufficient crypto balance");
+
+      const newAmount = (parseFloat(holding.amount) - parseFloat(cryptoAmount)).toFixed(8);
+      const [updated] = await tx.update(cryptoHoldings)
+        .set({ amount: newAmount })
+        .where(eq(cryptoHoldings.id, holdingId))
+        .returning();
+
+      const [account] = await tx.select().from(accounts).where(eq(accounts.id, accountId));
+      if (!account) throw new Error("Account not found");
+      const newBalance = (parseFloat(account.balance) + parseFloat(usdAmount)).toFixed(2);
+      await tx.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, accountId));
+
+      await tx.insert(transactions).values({
+        reference: `CRYPTO-SELL-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        type: "deposit",
+        amount: usdAmount,
+        toAccountId: accountId,
+        narration: `Sell ${cryptoAmount} ${holding.symbol}`,
+        status: "success"
+      });
+
+      return updated;
     });
   }
 

@@ -27,7 +27,7 @@ The project is a single repository with three main directories:
 - **Forms:** React Hook Form with Zod validation via `@hookform/resolvers`
 - **Fonts:** Outfit (display) and Plus Jakarta Sans (body)
 - **Build tool:** Vite
-- **Key pages:** AuthPage (login/register), CustomerDashboard, TransactionPage, AdminDashboard, AuditLogs
+- **Key pages:** AuthPage (login/register), CustomerDashboard, TransactionPage, AdminDashboard, ApplyPage (loan/equity/CC forms), CryptoPage (crypto trading), MobileDepositPage (check deposits)
 - **Path aliases:** `@/` maps to `client/src/`, `@shared/` maps to `shared/`
 
 ### Backend (`server/`)
@@ -47,7 +47,9 @@ The project is a single repository with three main directories:
   - `users` — Members and staff with roles, status (active/frozen), member numbers, dashboard widget preferences
   - `accounts` — Share Savings and Checking accounts with balances (decimal precision 15,2), account numbers, status
   - `account_applications` — Workflow for account opening approval (pending → approved/rejected)
-  - `transactions` — Ledger-style transaction log (deposit, transfer, billpay, adjustment_credit, adjustment_debit) with references, status, reason codes, staff user tracking
+  - `transactions` — Ledger-style transaction log (deposit, transfer, billpay, adjustment_credit, adjustment_debit, mobile_deposit) with references, status, reason codes, staff user tracking
+  - `mobile_deposits` — Mobile check deposit submissions with check image URLs, amount, approval status, staff reviewer
+  - `crypto_holdings` — Cryptocurrency holdings per user with symbol, name, and amount (decimal 18,8)
   - `audit_logs` — Security audit trail for all significant actions
 
 ### Storage Layer
@@ -67,8 +69,10 @@ The project is a single repository with three main directories:
 ### Key Design Decisions
 1. **Shared route contracts** (`shared/routes.ts`): Both client and server import the same Zod schemas and route definitions, ensuring type-safe API communication without code generation
 2. **Ledger-based balance management**: Balances are modified through transactions only. Admin balance adjustments create proper ledger entries (adjustment_credit/adjustment_debit) rather than direct edits
-3. **Account application workflow**: New accounts require staff approval before creation
-4. **Audit logging**: All significant actions (login, registration, transactions, admin operations) are logged for accountability
+3. **Account application workflow**: New accounts require staff approval before creation. Loan, home equity, and credit card applications store detailed form data (employment, income, property details) as JSONB for staff review
+4. **Cryptocurrency trading**: Simulated prices for 8 cryptocurrencies (BTC, ETH, SOL, ADA, DOT, LINK, XRP, DOGE) with server-side price validation. Buy/sell operations deduct/credit linked checking or savings accounts
+5. **Mobile check deposits**: Members submit check deposits (simulated camera capture) pending staff approval. Approved deposits credit the target account and create transaction records
+6. **Audit logging**: All significant actions (login, registration, transactions, crypto trades, mobile deposits, admin operations) are logged for accountability
 
 ## External Dependencies
 

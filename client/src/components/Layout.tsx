@@ -9,7 +9,10 @@ import {
   ShieldCheck, 
   Menu,
   UserCircle,
-  Camera
+  Camera,
+  FileText,
+  Coins,
+  Smartphone
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -120,6 +123,39 @@ export function Layout({ children }: { children: React.ReactNode }) {
               >
                 <CreditCard className="w-4 h-4" />
                 Transactions
+              </Button>
+            </Link>
+            <Link href="/apply">
+              <Button 
+                variant={location === "/apply" ? "secondary" : "ghost"} 
+                className="w-full justify-start gap-3"
+                onClick={() => setOpen(false)}
+                data-testid="nav-apply"
+              >
+                <FileText className="w-4 h-4" />
+                Apply
+              </Button>
+            </Link>
+            <Link href="/crypto">
+              <Button 
+                variant={location === "/crypto" ? "secondary" : "ghost"} 
+                className="w-full justify-start gap-3"
+                onClick={() => setOpen(false)}
+                data-testid="nav-crypto"
+              >
+                <Coins className="w-4 h-4" />
+                Crypto
+              </Button>
+            </Link>
+            <Link href="/mobile-deposit">
+              <Button 
+                variant={location === "/mobile-deposit" ? "secondary" : "ghost"} 
+                className="w-full justify-start gap-3"
+                onClick={() => setOpen(false)}
+                data-testid="nav-mobile-deposit"
+              >
+                <Smartphone className="w-4 h-4" />
+                Mobile Deposit
               </Button>
             </Link>
           </>
