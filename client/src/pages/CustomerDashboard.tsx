@@ -86,7 +86,7 @@ export default function CustomerDashboard() {
   const totalBalance = accounts?.reduce((sum, acc) => sum + Number(acc.balance), 0) || 0;
   const recentTransactions = transactions?.slice(0, 5) || [];
 
-  const currentWidgets = user?.dashboardWidgets || ["balance", "routing", "activity", "cards", "crypto", "home_equity"];
+  const currentWidgets = user?.dashboardWidgets || ["balance", "activity", "cards", "crypto", "home_equity"];
 
   const toggleWidget = (widget: string) => {
     const newWidgets = currentWidgets.includes(widget)
@@ -151,7 +151,6 @@ export default function CustomerDashboard() {
               <div className="space-y-4 py-4">
                 {[
                   { id: "balance", label: "Total Balance" },
-                  { id: "routing", label: "Routing Number" },
                   { id: "activity", label: "Recent Activity" },
                   { id: "cards", label: "Credit Cards" },
                   { id: "crypto", label: "Crypto Portfolio" },
@@ -228,9 +227,6 @@ export default function CustomerDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {currentWidgets.includes("balance") && (
           <StatCard title="Total Balance" value={`$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Wallet} className="bg-primary text-primary-foreground border-none" />
-        )}
-        {currentWidgets.includes("routing") && (
-          <StatCard title="Routing #" value="262275835" icon={AlertCircle} className="bg-card" />
         )}
         {currentWidgets.includes("crypto") && cryptoTotalValue > 0 && (
           <Link href="/crypto">
