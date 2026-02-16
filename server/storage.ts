@@ -39,6 +39,7 @@ export interface IStorage {
   getCryptoHoldingsByUserId(userId: number): Promise<CryptoHolding[]>;
   buyCrypto(userId: number, symbol: string, name: string, cryptoAmount: string, usdAmount: string, accountId: number): Promise<CryptoHolding>;
   sellCrypto(holdingId: number, cryptoAmount: string, usdAmount: string, accountId: number): Promise<CryptoHolding>;
+  sendCrypto(senderId: number, holdingId: number, amountCrypto: string, recipientId: number): Promise<void>;
 
   getCreditCardsByUserId(userId: number): Promise<CreditCard[]>;
   getCreditCard(id: number): Promise<CreditCard | undefined>;
@@ -369,6 +370,37 @@ export class DatabaseStorage implements IStorage {
       });
 
       return updated;
+    });
+  }
+
+  async sendCrypto(senderId: number, holdingId: number, amountCrypto: string, recipientId: number): Promise<void> {
+    return await db.transaction(async (tx) => {
+      const [holding] = await tx.select().from(cryptoHoldings).where(eq(cryptoHoldings.id, holdingId));
+      if (!holding) throw new Error("Holding not found");
+      if (holding.userId !== senderId) throw new Error("You do not own this holding");
+      if (parseFloat(holding.amount) < parseFloat(amountCrypto)) throw new Error("Insufficient crypto balance");
+
+      const newSenderAmount = (parseFloat(holding.amount) - parseFloat(amountCrypto)).toFixed(8);
+      await tx.update(cryptoHoldings)
+        .set({ amount: newSenderAmount })
+        .where(eq(cryptoHoldings.id, holdingId));
+
+      const existingRecipient = await tx.select().from(cryptoHoldings)
+        .where(and(eq(cryptoHoldings.userId, recipientId), eq(cryptoHoldings.symbol, holding.symbol)));
+
+      if (existingRecipient.length > 0) {
+        const newRecipientAmount = (parseFloat(existingRecipient[0].amount) + parseFloat(amountCrypto)).toFixed(8);
+        await tx.update(cryptoHoldings)
+          .set({ amount: newRecipientAmount })
+          .where(eq(cryptoHoldings.id, existingRecipient[0].id));
+      } else {
+        await tx.insert(cryptoHoldings).values({
+          userId: recipientId,
+          symbol: holding.symbol,
+          name: holding.name,
+          amount: amountCrypto,
+        });
+      }
     });
   }
 

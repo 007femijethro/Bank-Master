@@ -206,6 +206,32 @@ export async function registerRoutes(
     } catch (err: any) { res.status(400).json({ message: err.message }); }
   });
 
+  app.post(api.crypto.send.path, requireAuth, async (req, res) => {
+    try {
+      const input = api.crypto.send.input.parse(req.body);
+      const user = req.user as any;
+      if (user.status === 'frozen') return res.status(403).json({ message: "Account is frozen" });
+
+      const holdings = await storage.getCryptoHoldingsByUserId(user.id);
+      const holding = holdings.find(h => h.id === input.holdingId);
+      if (!holding) return res.status(403).json({ message: "Holding not found or not owned by you" });
+
+      const identifier = input.recipientIdentifier.trim();
+      let recipient = await storage.getUserByUsername(identifier);
+      if (!recipient) {
+        const allUsers = await storage.getAllUsers();
+        recipient = allUsers.find(u => u.memberNumber === identifier) || null;
+      }
+      if (!recipient) return res.status(400).json({ message: "Recipient not found. Check the email or member number." });
+      if (recipient.id === user.id) return res.status(400).json({ message: "You cannot send crypto to yourself." });
+      if (recipient.status !== 'active') return res.status(400).json({ message: "Recipient account is not active." });
+
+      await storage.sendCrypto(user.id, input.holdingId, input.amountCrypto, recipient.id);
+      await storage.createAuditLog(user.id, "CRYPTO_SEND", req.ip, { symbol: holding.symbol, amount: input.amountCrypto, recipientId: recipient.id });
+      res.status(200).json({ message: `Successfully sent ${input.amountCrypto} ${holding.symbol} to ${recipient.fullName}` });
+    } catch (err: any) { res.status(400).json({ message: err.message }); }
+  });
+
   // Bill Pay
   app.post(api.transactions.billpay.path, requireAuth, async (req, res) => {
     try {

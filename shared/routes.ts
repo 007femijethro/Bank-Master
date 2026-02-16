@@ -201,6 +201,19 @@ export const api = {
         400: errorSchemas.validation,
       },
     },
+    send: {
+      method: 'POST' as const,
+      path: '/api/crypto/send' as const,
+      input: z.object({
+        holdingId: z.number(),
+        amountCrypto: z.string(),
+        recipientIdentifier: z.string().min(1, "Recipient is required"),
+      }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: errorSchemas.validation,
+      },
+    },
   },
   admin: {
     users: {
