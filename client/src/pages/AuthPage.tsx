@@ -60,7 +60,7 @@ function formatZip(value: string): string {
 }
 
 const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
+  username: z.string().email("Valid email is required"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -75,7 +75,6 @@ const registerSchema = z.object({
   city: z.string().min(1, "City is required"),
   state: z.string().min(1, "State is required"),
   zipCode: z.string().length(5, "ZIP code must be 5 digits"),
-  username: z.string().min(3, "Username must be at least 3 characters"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -95,7 +94,7 @@ export default function AuthPage() {
     defaultValues: {
       firstName: "", lastName: "", email: "", phone: "",
       dateOfBirth: "", ssnLast4: "", address: "", city: "",
-      state: "", zipCode: "", username: "", password: "",
+      state: "", zipCode: "", password: "",
     },
   });
 
@@ -126,7 +125,6 @@ export default function AuthPage() {
       city: data.city,
       state: data.state,
       zipCode: data.zipCode,
-      username: data.username,
       password: data.password,
     };
     register.mutate(payload, {
@@ -176,9 +174,9 @@ export default function AuthPage() {
                       name="username"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Username</FormLabel>
+                          <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input placeholder="johndoe" {...field} data-testid="input-login-username" />
+                            <Input type="email" placeholder="john.doe@example.com" {...field} data-testid="input-login-email" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -410,35 +408,20 @@ export default function AuthPage() {
                       </div>
 
                       <div className="border-t pt-4 mt-2">
-                        <p className="text-xs text-muted-foreground mb-3">Create your login credentials</p>
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={registerForm.control}
-                            name="username"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Username</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="johndoe" {...field} data-testid="input-register-username" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={registerForm.control}
-                            name="password"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Password</FormLabel>
-                                <FormControl>
-                                  <Input type="password" placeholder="Min. 6 characters" {...field} data-testid="input-register-password" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
+                        <p className="text-xs text-muted-foreground mb-3">Create your login password</p>
+                        <FormField
+                          control={registerForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Password</FormLabel>
+                              <FormControl>
+                                <Input type="password" placeholder="Min. 6 characters" {...field} data-testid="input-register-password" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
 
                       <p className="text-xs text-muted-foreground">

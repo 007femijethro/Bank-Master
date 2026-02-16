@@ -30,7 +30,7 @@ export async function registerRoutes(
       const existingUser = await storage.getUserByUsername(input.email);
       if (existingUser) return res.status(400).json({ message: "Username already exists" });
       const hashedPassword = await storage.hashPassword(input.password);
-      const user = await storage.createUser({ ...input, password: hashedPassword });
+      const user = await storage.createUser({ ...input, password: hashedPassword, status: "pending" });
       await storage.createAuditLog(user.id, "REGISTER", req.ip);
       const { password: _pw, ...safeUser } = user as any;
       res.status(201).json({ ...safeUser, pending: true, message: "Your membership application has been submitted. A staff member will review and approve your account." });
@@ -222,6 +222,20 @@ export async function registerRoutes(
   app.get(api.admin.users.path, requireStaff, async (req, res) => {
     const allUsers = await storage.getAllUsers();
     res.json(allUsers.map(({ password, ...u }) => u));
+  });
+
+  app.patch(api.admin.updateUserStatus.path, requireStaff, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { status } = api.admin.updateUserStatus.input.parse(req.body);
+      const user = await storage.updateUserStatus(id, status);
+      await storage.createAuditLog((req.user as any).id, `USER_STATUS_${status.toUpperCase()}`, req.ip, `User ${id} status changed to ${status}`);
+      const { password: _pw, ...safeUser } = user as any;
+      res.json(safeUser);
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      res.status(500).json({ message: "Failed to update user status" });
+    }
   });
 
   app.get("/api/admin/applications", requireStaff, async (req, res) => {
