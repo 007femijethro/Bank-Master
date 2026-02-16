@@ -6,16 +6,28 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, CreditCard, Settings2, Check, History } from "lucide-react";
-import { useState } from "react";
+import { Plus, Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, CreditCard, Settings2, Check, History, Coins, Home, Eye, EyeOff } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@shared/routes";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Link } from "wouter";
+
+const CRYPTO_DATA = [
+  { symbol: "BTC", name: "Bitcoin", basePrice: 97284.50 },
+  { symbol: "ETH", name: "Ethereum", basePrice: 3642.80 },
+  { symbol: "SOL", name: "Solana", basePrice: 178.45 },
+  { symbol: "ADA", name: "Cardano", basePrice: 0.87 },
+  { symbol: "DOT", name: "Polkadot", basePrice: 8.92 },
+  { symbol: "LINK", name: "Chainlink", basePrice: 22.15 },
+  { symbol: "XRP", name: "Ripple", basePrice: 2.34 },
+  { symbol: "DOGE", name: "Dogecoin", basePrice: 0.32 },
+];
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
@@ -26,8 +38,35 @@ export default function CustomerDashboard() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [accountType, setAccountType] = useState<"share_savings" | "checking" | "loan" | "home_equity" | "credit_card">("share_savings");
+  const [showCardDetails, setShowCardDetails] = useState(false);
   
   const queryClient = useQueryClient();
+
+  const { data: creditCardsList } = useQuery({
+    queryKey: ["/api/credit-cards"],
+    queryFn: async () => {
+      const res = await fetch("/api/credit-cards");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const { data: cryptoHoldings } = useQuery({
+    queryKey: ["/api/crypto/holdings"],
+    queryFn: async () => {
+      const res = await fetch("/api/crypto/holdings");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const cryptoTotalValue = (cryptoHoldings || []).reduce((sum: number, h: any) => {
+    const coin = CRYPTO_DATA.find(c => c.symbol === h.symbol);
+    return sum + (coin ? parseFloat(h.amount) * coin.basePrice : 0);
+  }, 0);
+
+  const homeEquityAccounts = accounts?.filter(a => (a.type as string) === "home_equity") || [];
+  const primaryCreditCard = creditCardsList?.[0];
   const updateWidgets = useMutation({
     mutationFn: async (newWidgets: string[]) => {
       const res = await fetch("/api/user/widgets", {
@@ -47,7 +86,7 @@ export default function CustomerDashboard() {
   const totalBalance = accounts?.reduce((sum, acc) => sum + Number(acc.balance), 0) || 0;
   const recentTransactions = transactions?.slice(0, 5) || [];
 
-  const currentWidgets = user?.dashboardWidgets || ["balance", "routing", "activity", "cards"];
+  const currentWidgets = user?.dashboardWidgets || ["balance", "routing", "activity", "cards", "crypto", "home_equity"];
 
   const toggleWidget = (widget: string) => {
     const newWidgets = currentWidgets.includes(widget)
@@ -114,7 +153,9 @@ export default function CustomerDashboard() {
                   { id: "balance", label: "Total Balance" },
                   { id: "routing", label: "Routing Number" },
                   { id: "activity", label: "Recent Activity" },
-                  { id: "cards", label: "Debit/Credit Cards" },
+                  { id: "cards", label: "Credit Cards" },
+                  { id: "crypto", label: "Crypto Portfolio" },
+                  { id: "home_equity", label: "Home Equity" },
                 ].map((w) => (
                   <div key={w.id} className="flex items-center space-x-2">
                     <Checkbox 
@@ -191,13 +232,94 @@ export default function CustomerDashboard() {
         {currentWidgets.includes("routing") && (
           <StatCard title="Routing #" value="262275835" icon={AlertCircle} className="bg-card" />
         )}
-        {currentWidgets.includes("cards") && (
-          <>
-            <StatCard title="Debit Card" value="Active" icon={CreditCard} description="Virtual Card Ready" />
-            <StatCard title="Credit Card" value="N/A" icon={CreditCard} description="Coming Soon" className="opacity-50" />
-          </>
+        {currentWidgets.includes("crypto") && cryptoTotalValue > 0 && (
+          <Link href="/crypto">
+            <StatCard title="Crypto Portfolio" value={`$${cryptoTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Coins} description={`${(cryptoHoldings || []).length} asset${(cryptoHoldings || []).length !== 1 ? 's' : ''} held`} />
+          </Link>
+        )}
+        {currentWidgets.includes("home_equity") && homeEquityAccounts.length > 0 && (
+          homeEquityAccounts.map((acc: any) => (
+            <StatCard key={acc.id} title="Home Equity" value={`$${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Home} description={`Acct: ****${acc.accountNumber.slice(-4)}`} />
+          ))
         )}
       </div>
+
+      {currentWidgets.includes("cards") && primaryCreditCard && (
+        <Card data-testid="dashboard-credit-card">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+            <div>
+              <CardTitle className="text-base">Credit Card</CardTitle>
+              <CardDescription>****{primaryCreditCard.lastFour} {primaryCreditCard.cardType.replace('_', ' ')}</CardDescription>
+            </div>
+            <Link href="/credit-cards">
+              <Button variant="outline" size="sm" data-testid="button-view-cards">
+                Manage <ArrowUpRight className="w-3 h-3 ml-1" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6 flex-wrap">
+              <div className={`relative w-64 aspect-[1.586/1] bg-gradient-to-br ${primaryCreditCard.cardType === 'rewards' ? 'from-violet-600 to-indigo-700' : primaryCreditCard.cardType === 'travel' ? 'from-blue-600 to-cyan-700' : primaryCreditCard.cardType === 'low_interest' ? 'from-emerald-600 to-teal-700' : primaryCreditCard.cardType === 'secured' ? 'from-slate-600 to-zinc-700' : 'from-orange-500 to-amber-600'} rounded-xl p-4 text-white shadow-md`}>
+                <div className="flex justify-between items-start">
+                  <p className="text-[10px] uppercase tracking-widest opacity-80">RFCU</p>
+                  <CreditCard className="w-5 h-5 opacity-60" />
+                </div>
+                <p className="font-mono text-sm tracking-[0.15em] mt-4" data-testid="text-dashboard-card-number">
+                  {showCardDetails ? primaryCreditCard.cardNumber.replace(/(.{4})/g, "$1 ").trim() : `**** **** **** ${primaryCreditCard.lastFour}`}
+                </p>
+                <div className="flex justify-between items-end mt-3 text-[10px]">
+                  <div>
+                    <p className="opacity-60 uppercase">Cardholder</p>
+                    <p className="text-xs font-medium">{primaryCreditCard.cardholderName}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="opacity-60 uppercase">Exp</p>
+                    <p className="text-xs font-mono">{String(primaryCreditCard.expirationMonth).padStart(2, "0")}/{String(primaryCreditCard.expirationYear).slice(-2)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="opacity-60 uppercase">CVV</p>
+                    <p className="text-xs font-mono">{showCardDetails ? primaryCreditCard.cvv : "***"}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowCardDetails(!showCardDetails)}
+                  className="absolute top-2 right-2 p-1 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                  data-testid="button-toggle-card-reveal"
+                >
+                  {showCardDetails ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                </button>
+              </div>
+              <div className="flex-1 min-w-[180px] space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Credit Limit</span>
+                  <span className="font-bold" data-testid="text-dash-credit-limit">${Number(primaryCreditCard.creditLimit).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Current Balance</span>
+                  <span className="font-bold text-destructive" data-testid="text-dash-card-balance">${Number(primaryCreditCard.currentBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Available Credit</span>
+                  <span className="font-bold text-green-600" data-testid="text-dash-available-credit">${(Number(primaryCreditCard.creditLimit) - Number(primaryCreditCard.currentBalance)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">APR</span>
+                  <span className="font-semibold">{primaryCreditCard.apr}%</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${Math.min((Number(primaryCreditCard.currentBalance) / Number(primaryCreditCard.creditLimit)) * 100, 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {((Number(primaryCreditCard.currentBalance) / Number(primaryCreditCard.creditLimit)) * 100).toFixed(1)}% utilization
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-8 md:grid-cols-2">
         <div className="space-y-4">
