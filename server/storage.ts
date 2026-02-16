@@ -375,10 +375,13 @@ export class DatabaseStorage implements IStorage {
 
   async sendCrypto(senderId: number, holdingId: number, amountCrypto: string, recipientId: number): Promise<void> {
     return await db.transaction(async (tx) => {
+      const amount = parseFloat(amountCrypto);
+      if (!isFinite(amount) || amount <= 0) throw new Error("Amount must be greater than zero");
+
       const [holding] = await tx.select().from(cryptoHoldings).where(eq(cryptoHoldings.id, holdingId));
       if (!holding) throw new Error("Holding not found");
       if (holding.userId !== senderId) throw new Error("You do not own this holding");
-      if (parseFloat(holding.amount) < parseFloat(amountCrypto)) throw new Error("Insufficient crypto balance");
+      if (parseFloat(holding.amount) < amount) throw new Error("Insufficient crypto balance");
 
       const newSenderAmount = (parseFloat(holding.amount) - parseFloat(amountCrypto)).toFixed(8);
       await tx.update(cryptoHoldings)

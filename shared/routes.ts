@@ -206,7 +206,7 @@ export const api = {
       path: '/api/crypto/send' as const,
       input: z.object({
         holdingId: z.number(),
-        amountCrypto: z.string(),
+        amountCrypto: z.string().regex(/^\d+(\.\d{1,8})?$/, "Invalid crypto amount"),
         recipientIdentifier: z.string().min(1, "Recipient is required"),
       }),
       responses: {

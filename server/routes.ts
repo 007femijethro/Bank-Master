@@ -220,7 +220,7 @@ export async function registerRoutes(
       let recipient = await storage.getUserByUsername(identifier);
       if (!recipient) {
         const allUsers = await storage.getAllUsers();
-        recipient = allUsers.find(u => u.memberNumber === identifier) || null;
+        recipient = allUsers.find(u => u.memberNumber === identifier) || undefined;
       }
       if (!recipient) return res.status(400).json({ message: "Recipient not found. Check the email or member number." });
       if (recipient.id === user.id) return res.status(400).json({ message: "You cannot send crypto to yourself." });

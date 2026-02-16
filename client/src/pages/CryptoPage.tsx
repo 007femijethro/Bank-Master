@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Coins } from "lucide-react";
+import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Coins, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 const CRYPTO_DATA = [
@@ -53,6 +53,10 @@ export default function CryptoPage() {
   const [sellAmount, setSellAmount] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [selectedHolding, setSelectedHolding] = useState<string>("");
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sendHolding, setSendHolding] = useState<string>("");
+  const [sendAmount, setSendAmount] = useState("");
+  const [sendRecipient, setSendRecipient] = useState("");
 
   const { data: holdings } = useQuery({
     queryKey: ["/api/crypto/holdings"],
@@ -115,6 +119,32 @@ export default function CryptoPage() {
     },
   });
 
+  const sendCrypto = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch("/api/crypto/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message);
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crypto/holdings"] });
+      setSendOpen(false);
+      setSendAmount("");
+      setSendRecipient("");
+      setSendHolding("");
+      toast({ title: "Transfer Complete", description: data.message });
+    },
+    onError: (e: any) => {
+      toast({ variant: "destructive", title: "Transfer Failed", description: e.message });
+    },
+  });
+
   const handleBuy = () => {
     if (!selectedCrypto || !buyAmount || !selectedAccount) return;
     const coin = prices.find(c => c.symbol === selectedCrypto);
@@ -141,6 +171,22 @@ export default function CryptoPage() {
       amountCrypto: sellAmount,
       usdAmount,
       accountId: parseInt(selectedAccount),
+    });
+  };
+
+  const handleSend = () => {
+    if (!sendHolding || !sendAmount || !sendRecipient) return;
+    const holding = holdings?.find((h: any) => h.id === parseInt(sendHolding));
+    if (!holding) return;
+    const amt = parseFloat(sendAmount);
+    if (amt <= 0 || amt > parseFloat(holding.amount)) {
+      toast({ variant: "destructive", title: "Invalid Amount", description: `Amount must be between 0 and ${parseFloat(holding.amount).toFixed(8)}` });
+      return;
+    }
+    sendCrypto.mutate({
+      holdingId: parseInt(sendHolding),
+      amountCrypto: sendAmount,
+      recipientIdentifier: sendRecipient,
     });
   };
 
@@ -256,6 +302,56 @@ export default function CryptoPage() {
               <DialogFooter>
                 <Button data-testid="button-confirm-sell" onClick={handleSell} disabled={sellCrypto.isPending}>
                   {sellCrypto.isPending ? "Processing..." : "Confirm Sale"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-send-crypto" variant="outline" disabled={!holdings?.length}>
+                <Send className="w-4 h-4 mr-2" /> Send Crypto
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Send Cryptocurrency</DialogTitle>
+                <DialogDescription>Transfer crypto to another Redbird FCU member using their email or member number.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Select Holding</Label>
+                  <Select value={sendHolding} onValueChange={setSendHolding}>
+                    <SelectTrigger data-testid="select-send-holding"><SelectValue placeholder="Choose holding" /></SelectTrigger>
+                    <SelectContent>
+                      {holdings?.filter((h: any) => parseFloat(h.amount) > 0).map((h: any) => (
+                        <SelectItem key={h.id} value={String(h.id)}>{h.name} ({h.symbol}) - {parseFloat(h.amount).toFixed(8)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Amount to Send</Label>
+                  <Input data-testid="input-send-amount" type="number" step="0.00000001" min="0.00000001" placeholder="0.001" value={sendAmount} onChange={(e) => setSendAmount(e.target.value)} />
+                  {sendHolding && (
+                    <p className="text-xs text-muted-foreground">
+                      Available: {parseFloat(holdings?.find((h: any) => h.id === parseInt(sendHolding))?.amount || "0").toFixed(8)} {holdings?.find((h: any) => h.id === parseInt(sendHolding))?.symbol}
+                    </p>
+                  )}
+                  {sendHolding && sendAmount && (
+                    <p className="text-xs text-muted-foreground">
+                      Estimated value: ${(parseFloat(sendAmount || "0") * (prices.find(c => c.symbol === holdings?.find((h: any) => h.id === parseInt(sendHolding))?.symbol)?.price || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Recipient (Email or Member Number)</Label>
+                  <Input data-testid="input-send-recipient" type="text" placeholder="member@email.com or 1234567" value={sendRecipient} onChange={(e) => setSendRecipient(e.target.value)} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button data-testid="button-confirm-send" onClick={handleSend} disabled={sendCrypto.isPending}>
+                  {sendCrypto.isPending ? "Processing..." : "Send Crypto"}
                 </Button>
               </DialogFooter>
             </DialogContent>
