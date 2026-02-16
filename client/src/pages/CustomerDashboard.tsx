@@ -131,7 +131,7 @@ export default function CustomerDashboard() {
             </AvatarFallback>
           </Avatar>
           <div>
-            <h2 className="text-3xl font-display font-bold text-foreground">RFCU Dashboard</h2>
+            <h2 className="text-3xl font-display font-bold text-foreground">Redbird FCU Dashboard</h2>
             <p className="text-muted-foreground">Member: {user?.fullName} | Member #: {user?.memberNumber}</p>
           </div>
         </div>
@@ -257,7 +257,7 @@ export default function CustomerDashboard() {
             <div className="flex items-center gap-6 flex-wrap">
               <div className={`relative w-64 aspect-[1.586/1] bg-gradient-to-br ${primaryCreditCard.cardType === 'rewards' ? 'from-violet-600 to-indigo-700' : primaryCreditCard.cardType === 'travel' ? 'from-blue-600 to-cyan-700' : primaryCreditCard.cardType === 'low_interest' ? 'from-emerald-600 to-teal-700' : primaryCreditCard.cardType === 'secured' ? 'from-slate-600 to-zinc-700' : 'from-orange-500 to-amber-600'} rounded-xl p-4 text-white shadow-md`}>
                 <div className="flex justify-between items-start">
-                  <p className="text-[10px] uppercase tracking-widest opacity-80">RFCU</p>
+                  <p className="text-[10px] uppercase tracking-widest opacity-80">REDBIRD FCU</p>
                   <CreditCard className="w-5 h-5 opacity-60" />
                 </div>
                 <p className="font-mono text-sm tracking-[0.15em] mt-4" data-testid="text-dashboard-card-number">
@@ -371,7 +371,7 @@ export default function CustomerDashboard() {
         )}
       </div>
       <footer className="text-center py-8 text-xs text-muted-foreground border-t">
-        RFCU is federally insured by the NCUA up to $250,000.
+        Redbird FCU is federally insured by the NCUA up to $250,000.
       </footer>
     </div>
   );

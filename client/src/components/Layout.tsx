@@ -72,7 +72,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="px-6 py-4 mb-6">
         <h1 className="text-2xl font-display font-bold text-primary flex items-center gap-2">
           <ShieldCheck className="w-8 h-8" />
-          RFCU
+          Redbird FCU
         </h1>
         <p className="text-[10px] text-muted-foreground mt-1 font-mono uppercase tracking-wider">
           Routing: 262275835
@@ -278,7 +278,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-border p-4 flex items-center justify-between">
         <h1 className="text-xl font-display font-bold text-primary flex items-center gap-2">
           <ShieldCheck className="w-6 h-6" />
-          RFCU
+          Redbird FCU
         </h1>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>

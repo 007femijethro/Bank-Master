@@ -55,7 +55,7 @@ function CreditCardVisual({ card, showDetails, onToggle }: { card: any; showDeta
     <div className={`relative w-full max-w-md aspect-[1.586/1] bg-gradient-to-br ${gradient} rounded-xl p-6 text-white shadow-lg`} data-testid={`card-visual-${card.id}`}>
       <div className="flex justify-between items-start">
         <div>
-          <p className="text-xs uppercase tracking-widest opacity-80">RFCU</p>
+          <p className="text-xs uppercase tracking-widest opacity-80">REDBIRD FCU</p>
           <p className="text-sm font-medium mt-1">{CARD_TYPE_LABELS[card.cardType] || card.cardType}</p>
         </div>
         <CreditCard className="w-8 h-8 opacity-60" />
@@ -204,7 +204,7 @@ export default function CreditCardsPage() {
     <div className="space-y-8">
       <div>
         <h2 className="text-3xl font-display font-bold text-foreground" data-testid="text-cc-title">Credit Cards</h2>
-        <p className="text-muted-foreground">Manage your RFCU credit cards, make purchases, and view statements.</p>
+        <p className="text-muted-foreground">Manage your Redbird FCU credit cards, make purchases, and view statements.</p>
       </div>
 
       {isLoading ? (
@@ -447,7 +447,7 @@ export default function CreditCardsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Card Details</CardTitle>
-          <CardDescription>Important information about your RFCU credit cards.</CardDescription>
+          <CardDescription>Important information about your Redbird FCU credit cards.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">

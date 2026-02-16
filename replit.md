@@ -1,8 +1,8 @@
-# Replit Federal Credit Union (RFCU) - Dummy Bank Web App
+# Redbird Federal Credit Union (Redbird FCU) - Dummy Bank Web App
 
 ## Overview
 
-This is a **Credit Union simulation web application** (RFCU - Replit Federal Credit Union) built as a Masters-level demo project. It simulates core banking/credit union operations including member registration, account management, transactions (deposits, transfers, bill pay), staff/admin tools, and audit logging. The currency is USD and the app uses credit union terminology (Members, Share Accounts, Staff/Teller).
+This is a **Credit Union simulation web application** (Redbird FCU - Redbird Federal Credit Union) built as a Masters-level demo project. It simulates core banking/credit union operations including member registration, account management, transactions (deposits, transfers, bill pay), staff/admin tools, and audit logging. The currency is USD and the app uses credit union terminology (Members, Share Accounts, Staff/Teller).
 
 This is **not** a real banking application — it's a realistic simulation with proper security patterns (password hashing, sessions, server-side validation, audit logs, database transactions for money transfers).
 

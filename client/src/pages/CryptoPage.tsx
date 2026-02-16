@@ -154,7 +154,7 @@ export default function CryptoPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-display font-bold text-foreground">Crypto Portfolio</h2>
-          <p className="text-muted-foreground">Buy, sell, and track cryptocurrency directly from your RFCU account.</p>
+          <p className="text-muted-foreground">Buy, sell, and track cryptocurrency directly from your Redbird FCU account.</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={buyOpen} onOpenChange={setBuyOpen}>

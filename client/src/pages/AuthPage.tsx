@@ -150,8 +150,8 @@ export default function AuthPage() {
           <div className="flex items-center justify-center gap-2 text-primary mb-4">
             <ShieldCheck className="w-12 h-12" />
           </div>
-          <h1 className="text-4xl font-display font-bold tracking-tight" data-testid="text-brand-name">RFCU</h1>
-          <p className="text-muted-foreground text-lg">Replit Federal Credit Union</p>
+          <h1 className="text-4xl font-display font-bold tracking-tight" data-testid="text-brand-name">Redbird FCU</h1>
+          <p className="text-muted-foreground text-lg">Redbird Federal Credit Union</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -209,7 +209,7 @@ export default function AuthPage() {
             <Card className="border-t-4 border-t-primary shadow-xl">
               <CardHeader>
                 <CardTitle>Apply for Membership</CardTitle>
-                <CardDescription>Complete the form below to apply for RFCU membership. Your application will be reviewed by staff.</CardDescription>
+                <CardDescription>Complete the form below to apply for Redbird FCU membership. Your application will be reviewed by staff.</CardDescription>
               </CardHeader>
               <CardContent>
                 {registrationPending ? (
@@ -227,7 +227,7 @@ export default function AuthPage() {
                       <Clock className="h-4 w-4" />
                       <AlertTitle>What happens next?</AlertTitle>
                       <AlertDescription>
-                        Once a staff member approves your application, you'll be able to log in with your credentials. You'll receive access to all RFCU member services.
+                        Once a staff member approves your application, you'll be able to log in with your credentials. You'll receive access to all Redbird FCU member services.
                       </AlertDescription>
                     </Alert>
                     <Button variant="outline" className="w-full" onClick={() => { setRegistrationPending(false); setActiveTab("login"); }} data-testid="button-back-to-login">
@@ -425,7 +425,7 @@ export default function AuthPage() {
                       </div>
 
                       <p className="text-xs text-muted-foreground">
-                        By submitting, you agree that the information provided is accurate. Your application will be reviewed by RFCU staff before activation.
+                        By submitting, you agree that the information provided is accurate. Your application will be reviewed by Redbird FCU staff before activation.
                       </p>
                       <Button type="submit" className="w-full" disabled={register.isPending} data-testid="button-submit-register">
                         {register.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Submit Application"}

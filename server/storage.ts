@@ -144,7 +144,7 @@ export class DatabaseStorage implements IStorage {
         const cardType = formData.cardType || "rewards";
         const limit = formData.requestedLimit || "5000";
         const user = await this.getUser(app.userId);
-        const cardholderName = user?.fullName || "RFCU Member";
+        const cardholderName = user?.fullName || "Redbird FCU Member";
         await this.createCreditCard(app.userId, app.id, cardType, limit, cardholderName);
       }
 
