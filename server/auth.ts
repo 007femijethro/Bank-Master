@@ -2,11 +2,12 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import connectPgSimple from "connect-pg-simple";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User } from "@shared/schema";
+import { pool } from "./db";
 
 declare global {
   namespace Express {
@@ -15,14 +16,18 @@ declare global {
 }
 
 export function setupAuth(app: Express) {
-  const MemoryStore = createMemoryStore(session);
+  const PgStore = connectPgSimple(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "r3pl1t_s3cr3t_k3y",
     resave: false,
     saveUninitialized: false,
-    cookie: {},
-    store: new MemoryStore({
-      checkPeriod: 86400000,
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    },
+    store: new PgStore({
+      pool: pool,
+      tableName: "user_sessions",
+      createTableIfMissing: true,
     }),
   };
 
@@ -30,6 +35,7 @@ export function setupAuth(app: Express) {
     app.set("trust proxy", 1);
     sessionSettings.cookie = {
       secure: true,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
     };
   }
 
@@ -45,7 +51,6 @@ export function setupAuth(app: Express) {
           return done(null, false, { message: "Incorrect username." });
         }
         
-        // For Dummy Bank requirement: Frozen users cannot login
         if (user.status === "frozen") {
           return done(null, false, { message: "Account is frozen." });
         }

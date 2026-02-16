@@ -34,7 +34,8 @@ export async function registerRoutes(
       await storage.createAuditLog(user.id, "REGISTER", req.ip);
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(201).json(user);
+        const { password: _pw, ...safeUser } = user as any;
+        res.status(201).json(safeUser);
       });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
@@ -49,7 +50,8 @@ export async function registerRoutes(
       req.login(user, async (err) => {
         if (err) return next(err);
         await storage.createAuditLog(user.id, "LOGIN_SUCCESS", req.ip);
-        return res.status(200).json(user);
+        const { password: _pw, ...safeUser } = user;
+        return res.status(200).json(safeUser);
       });
     })(req, res, next);
   });
@@ -65,8 +67,8 @@ export async function registerRoutes(
 
   app.get(api.auth.me.path, (req, res) => {
     if (req.isAuthenticated()) {
-      const user = req.user as any;
-      res.json(user);
+      const { password, ...safeUser } = req.user as any;
+      res.json(safeUser);
     } else {
       res.status(401).send();
     }
@@ -222,14 +224,18 @@ export async function registerRoutes(
   // Admin Routes
   app.get(api.admin.users.path, requireStaff, async (req, res) => {
     const allUsers = await storage.getAllUsers();
-    res.json(allUsers);
+    res.json(allUsers.map(({ password, ...u }) => u));
   });
 
   app.get("/api/admin/applications", requireStaff, async (req, res) => {
     const apps = await storage.getApplications();
     const appsWithUsers = await Promise.all(apps.map(async (app) => {
       const user = await storage.getUser(app.userId);
-      return { ...app, user };
+      if (user) {
+        const { password, ...safeUser } = user as any;
+        return { ...app, user: safeUser };
+      }
+      return { ...app, user: null };
     }));
     res.json(appsWithUsers);
   });
