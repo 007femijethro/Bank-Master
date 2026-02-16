@@ -22,7 +22,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  setupAuth(app);
+  await setupAuth(app);
 
   app.post(api.auth.register.path, async (req, res, next) => {
     try {
