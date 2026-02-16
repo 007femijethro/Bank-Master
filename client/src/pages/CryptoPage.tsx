@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Coins, Send } from "lucide-react";
+import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft, Coins, Send, Copy, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 const CRYPTO_DATA = [
@@ -57,6 +57,7 @@ export default function CryptoPage() {
   const [sendHolding, setSendHolding] = useState<string>("");
   const [sendAmount, setSendAmount] = useState("");
   const [sendRecipient, setSendRecipient] = useState("");
+  const [copiedAddr, setCopiedAddr] = useState<string | null>(null);
 
   const { data: holdings } = useQuery({
     queryKey: ["/api/crypto/holdings"],
@@ -316,7 +317,7 @@ export default function CryptoPage() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Send Cryptocurrency</DialogTitle>
-                <DialogDescription>Transfer crypto to another Redbird FCU member using their email or member number.</DialogDescription>
+                <DialogDescription>Transfer crypto to another Redbird FCU member using their email, member number, or wallet address.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -345,8 +346,8 @@ export default function CryptoPage() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Recipient (Email or Member Number)</Label>
-                  <Input data-testid="input-send-recipient" type="text" placeholder="member@email.com or 1234567" value={sendRecipient} onChange={(e) => setSendRecipient(e.target.value)} />
+                  <Label>Recipient (Email, Member Number, or Wallet Address)</Label>
+                  <Input data-testid="input-send-recipient" type="text" placeholder="Email, member #, or wallet address" value={sendRecipient} onChange={(e) => setSendRecipient(e.target.value)} />
                 </div>
               </div>
               <DialogFooter>
@@ -384,6 +385,7 @@ export default function CryptoPage() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="p-3 text-left font-medium">Asset</th>
+                    <th className="p-3 text-left font-medium">Wallet Address</th>
                     <th className="p-3 text-right font-medium">Amount</th>
                     <th className="p-3 text-right font-medium">Price</th>
                     <th className="p-3 text-right font-medium">Value</th>
@@ -394,7 +396,7 @@ export default function CryptoPage() {
                     const coin = prices.find(c => c.symbol === h.symbol);
                     const value = coin ? parseFloat(h.amount) * coin.price : 0;
                     return (
-                      <tr key={h.id} className="border-b last:border-0">
+                      <tr key={h.id} className="border-b last:border-0" data-testid={`row-holding-${h.id}`}>
                         <td className="p-3">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">{h.symbol.charAt(0)}</div>
@@ -403,6 +405,29 @@ export default function CryptoPage() {
                               <div className="text-xs text-muted-foreground">{h.symbol}</div>
                             </div>
                           </div>
+                        </td>
+                        <td className="p-3">
+                          {h.walletAddress && (
+                            <div className="flex items-center gap-1">
+                              <code className="text-xs font-mono text-muted-foreground max-w-[140px] truncate" data-testid={`text-wallet-${h.id}`} title={h.walletAddress}>
+                                {h.walletAddress}
+                              </code>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                data-testid={`button-copy-wallet-${h.id}`}
+                                onClick={() => {
+                                  navigator.clipboard.writeText(h.walletAddress);
+                                  setCopiedAddr(h.walletAddress);
+                                  setTimeout(() => setCopiedAddr(null), 2000);
+                                  toast({ title: "Copied", description: "Wallet address copied to clipboard." });
+                                }}
+                              >
+                                {copiedAddr === h.walletAddress ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                              </Button>
+                            </div>
+                          )}
                         </td>
                         <td className="p-3 text-right font-mono">{parseFloat(h.amount).toFixed(8)}</td>
                         <td className="p-3 text-right">${coin?.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>

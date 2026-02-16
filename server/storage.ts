@@ -6,6 +6,21 @@ import { promisify } from "util";
 
 const scryptAsync = promisify(scrypt);
 
+const WALLET_PREFIXES: Record<string, string> = {
+  BTC: "bc1q", ETH: "0x", SOL: "", ADA: "addr1", DOT: "1", LINK: "0x", XRP: "r", DOGE: "D"
+};
+
+function generateWalletAddress(symbol: string): string {
+  const prefix = WALLET_PREFIXES[symbol] || "0x";
+  const hexChars = "abcdef0123456789";
+  const len = symbol === "BTC" ? 38 : symbol === "SOL" ? 44 : symbol === "ADA" ? 58 : 40;
+  let addr = prefix;
+  for (let i = 0; i < len - prefix.length; i++) {
+    addr += hexChars[Math.floor(Math.random() * hexChars.length)];
+  }
+  return addr;
+}
+
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -37,6 +52,7 @@ export interface IStorage {
   reviewMobileDeposit(id: number, status: "approved" | "rejected", reviewedBy: number, reason?: string): Promise<MobileDeposit>;
 
   getCryptoHoldingsByUserId(userId: number): Promise<CryptoHolding[]>;
+  getCryptoHoldingByWalletAddress(walletAddress: string): Promise<CryptoHolding | undefined>;
   buyCrypto(userId: number, symbol: string, name: string, cryptoAmount: string, usdAmount: string, accountId: number): Promise<CryptoHolding>;
   sellCrypto(holdingId: number, cryptoAmount: string, usdAmount: string, accountId: number): Promise<CryptoHolding>;
   sendCrypto(senderId: number, holdingId: number, amountCrypto: string, recipientId: number): Promise<void>;
@@ -300,7 +316,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCryptoHoldingsByUserId(userId: number): Promise<CryptoHolding[]> {
-    return await db.select().from(cryptoHoldings).where(eq(cryptoHoldings.userId, userId));
+    const holdings = await db.select().from(cryptoHoldings).where(eq(cryptoHoldings.userId, userId));
+    const updates = [];
+    for (const h of holdings) {
+      if (!h.walletAddress) {
+        const addr = generateWalletAddress(h.symbol);
+        updates.push(db.update(cryptoHoldings).set({ walletAddress: addr }).where(eq(cryptoHoldings.id, h.id)));
+        h.walletAddress = addr;
+      }
+    }
+    if (updates.length > 0) await Promise.all(updates);
+    return holdings;
+  }
+
+  async getCryptoHoldingByWalletAddress(walletAddress: string): Promise<CryptoHolding | undefined> {
+    const [holding] = await db.select().from(cryptoHoldings).where(eq(cryptoHoldings.walletAddress, walletAddress));
+    return holding;
   }
 
   async buyCrypto(userId: number, symbol: string, name: string, cryptoAmount: string, usdAmount: string, accountId: number): Promise<CryptoHolding> {
@@ -336,7 +367,8 @@ export class DatabaseStorage implements IStorage {
           userId,
           symbol,
           name,
-          amount: cryptoAmount
+          amount: cryptoAmount,
+          walletAddress: generateWalletAddress(symbol),
         }).returning();
         return holding;
       }
@@ -402,6 +434,7 @@ export class DatabaseStorage implements IStorage {
           symbol: holding.symbol,
           name: holding.name,
           amount: amountCrypto,
+          walletAddress: generateWalletAddress(holding.symbol),
         });
       }
     });

@@ -222,7 +222,16 @@ export async function registerRoutes(
         const allUsers = await storage.getAllUsers();
         recipient = allUsers.find(u => u.memberNumber === identifier) || undefined;
       }
-      if (!recipient) return res.status(400).json({ message: "Recipient not found. Check the email or member number." });
+      if (!recipient) {
+        const recipientHolding = await storage.getCryptoHoldingByWalletAddress(identifier);
+        if (recipientHolding) {
+          if (recipientHolding.symbol !== holding.symbol) {
+            return res.status(400).json({ message: `That wallet address is for ${recipientHolding.symbol}, but you are sending ${holding.symbol}. Use a ${holding.symbol} wallet address.` });
+          }
+          recipient = await storage.getUser(recipientHolding.userId);
+        }
+      }
+      if (!recipient) return res.status(400).json({ message: "Recipient not found. Check the email, member number, or wallet address." });
       if (recipient.id === user.id) return res.status(400).json({ message: "You cannot send crypto to yourself." });
       if (recipient.status !== 'active') return res.status(400).json({ message: "Recipient account is not active." });
 

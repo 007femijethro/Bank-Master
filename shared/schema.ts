@@ -98,6 +98,7 @@ export const cryptoHoldings = pgTable("crypto_holdings", {
   symbol: text("symbol").notNull(),
   name: text("name").notNull(),
   amount: decimal("amount", { precision: 18, scale: 8 }).default("0").notNull(),
+  walletAddress: text("wallet_address"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
