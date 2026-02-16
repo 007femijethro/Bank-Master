@@ -147,6 +147,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 Crypto
               </Button>
             </Link>
+            <Link href="/credit-cards">
+              <Button 
+                variant={location === "/credit-cards" ? "secondary" : "ghost"} 
+                className="w-full justify-start gap-3"
+                onClick={() => setOpen(false)}
+                data-testid="nav-credit-cards"
+              >
+                <CreditCard className="w-4 h-4" />
+                Credit Cards
+              </Button>
+            </Link>
             <Link href="/mobile-deposit">
               <Button 
                 variant={location === "/mobile-deposit" ? "secondary" : "ghost"} 

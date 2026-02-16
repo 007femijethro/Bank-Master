@@ -11,6 +11,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import ApplyPage from "@/pages/ApplyPage";
 import CryptoPage from "@/pages/CryptoPage";
 import MobileDepositPage from "@/pages/MobileDepositPage";
+import CreditCardsPage from "@/pages/CreditCardsPage";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
@@ -57,6 +58,9 @@ function Router() {
       </Route>
       <Route path="/crypto">
         <ProtectedRoute component={CryptoPage} />
+      </Route>
+      <Route path="/credit-cards">
+        <ProtectedRoute component={CreditCardsPage} />
       </Route>
       <Route path="/mobile-deposit">
         <ProtectedRoute component={MobileDepositPage} />

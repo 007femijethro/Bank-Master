@@ -1,4 +1,4 @@
-import { users, accounts, transactions, auditLogs, accountApplications, mobileDeposits, cryptoHoldings, type User, type InsertUser, type Account, type Transaction, type AuditLog, type AccountApplication, type InsertApplication, type MobileDeposit, type CryptoHolding } from "@shared/schema";
+import { users, accounts, transactions, auditLogs, accountApplications, mobileDeposits, cryptoHoldings, creditCards, type User, type InsertUser, type Account, type Transaction, type AuditLog, type AccountApplication, type InsertApplication, type MobileDeposit, type CryptoHolding, type CreditCard } from "@shared/schema";
 import { db } from "./db";
 import { eq, or, desc, sql, and } from "drizzle-orm";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
@@ -39,6 +39,14 @@ export interface IStorage {
   getCryptoHoldingsByUserId(userId: number): Promise<CryptoHolding[]>;
   buyCrypto(userId: number, symbol: string, name: string, cryptoAmount: string, usdAmount: string, accountId: number): Promise<CryptoHolding>;
   sellCrypto(holdingId: number, cryptoAmount: string, usdAmount: string, accountId: number): Promise<CryptoHolding>;
+
+  getCreditCardsByUserId(userId: number): Promise<CreditCard[]>;
+  getCreditCard(id: number): Promise<CreditCard | undefined>;
+  getAllCreditCards(): Promise<CreditCard[]>;
+  createCreditCard(userId: number, applicationId: number, cardType: string, creditLimit: string, cardholderName: string): Promise<CreditCard>;
+  creditCardPurchase(cardId: number, amount: string, merchant: string): Promise<Transaction>;
+  creditCardPayment(cardId: number, fromAccountId: number, amount: string): Promise<Transaction>;
+  getTransactionsByCreditCardId(cardId: number): Promise<Transaction[]>;
 
   createAuditLog(actorUserId: number | undefined, action: string, ipAddress?: string, metadata?: any): Promise<AuditLog>;
   getAuditLogs(): Promise<AuditLog[]>;
@@ -130,6 +138,16 @@ export class DatabaseStorage implements IStorage {
       if (status === "approved" && (app.type === "share_savings" || app.type === "checking")) {
         await this.createAccount(app.userId, app.type as any);
       }
+
+      if (status === "approved" && app.type === "credit_card") {
+        const formData = app.formData || {};
+        const cardType = formData.cardType || "rewards";
+        const limit = formData.requestedLimit || "5000";
+        const user = await this.getUser(app.userId);
+        const cardholderName = user?.fullName || "RFCU Member";
+        await this.createCreditCard(app.userId, app.id, cardType, limit, cardholderName);
+      }
+
       return app;
     });
   }
@@ -352,6 +370,144 @@ export class DatabaseStorage implements IStorage {
 
       return updated;
     });
+  }
+
+  // === Credit Card Methods ===
+
+  async getCreditCardsByUserId(userId: number): Promise<CreditCard[]> {
+    return await db.select().from(creditCards).where(eq(creditCards.userId, userId)).orderBy(desc(creditCards.createdAt));
+  }
+
+  async getCreditCard(id: number): Promise<CreditCard | undefined> {
+    const [card] = await db.select().from(creditCards).where(eq(creditCards.id, id));
+    return card;
+  }
+
+  async getAllCreditCards(): Promise<CreditCard[]> {
+    return await db.select().from(creditCards).orderBy(desc(creditCards.createdAt));
+  }
+
+  async createCreditCard(userId: number, applicationId: number, cardType: string, creditLimit: string, cardholderName: string): Promise<CreditCard> {
+    const cardNumber = this.generateCardNumber();
+    const lastFour = cardNumber.slice(-4);
+    const cvv = Math.floor(100 + Math.random() * 900).toString();
+    const now = new Date();
+    const expirationMonth = now.getMonth() + 1;
+    const expirationYear = now.getFullYear() + 3;
+
+    const aprMap: Record<string, string> = {
+      rewards: "18.99",
+      travel: "19.99",
+      low_interest: "12.49",
+      secured: "22.99",
+      student: "21.49",
+    };
+    const apr = aprMap[cardType] || "18.99";
+
+    const [card] = await db.insert(creditCards).values({
+      userId,
+      applicationId,
+      cardNumber,
+      lastFour,
+      cardholderName: cardholderName.toUpperCase(),
+      cardType: cardType as any,
+      creditLimit,
+      currentBalance: "0.00",
+      apr,
+      cvv,
+      expirationMonth,
+      expirationYear,
+      status: "active",
+    }).returning();
+    return card;
+  }
+
+  private generateCardNumber(): string {
+    const prefix = "4";
+    let number = prefix;
+    for (let i = 1; i < 15; i++) {
+      number += Math.floor(Math.random() * 10).toString();
+    }
+    let sum = 0;
+    let alternate = false;
+    for (let i = number.length - 1; i >= 0; i--) {
+      let n = parseInt(number[i], 10);
+      if (alternate) {
+        n *= 2;
+        if (n > 9) n -= 9;
+      }
+      sum += n;
+      alternate = !alternate;
+    }
+    const checkDigit = (10 - (sum % 10)) % 10;
+    return number + checkDigit.toString();
+  }
+
+  async creditCardPurchase(cardId: number, amount: string, merchant: string): Promise<Transaction> {
+    return await db.transaction(async (tx) => {
+      const [card] = await tx.select().from(creditCards).where(eq(creditCards.id, cardId));
+      if (!card) throw new Error("Credit card not found");
+      if (card.status !== "active") throw new Error("Credit card is not active");
+
+      const amt = parseFloat(amount);
+      const currentBal = parseFloat(card.currentBalance);
+      const limit = parseFloat(card.creditLimit);
+      const availableCredit = limit - currentBal;
+
+      if (amt > availableCredit) throw new Error("Insufficient credit. Available: $" + availableCredit.toFixed(2));
+
+      const newBalance = (currentBal + amt).toFixed(2);
+      await tx.update(creditCards).set({ currentBalance: newBalance }).where(eq(creditCards.id, cardId));
+
+      const [transaction] = await tx.insert(transactions).values({
+        reference: `CC-PUR-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        type: "credit_card_purchase",
+        amount,
+        creditCardId: cardId,
+        narration: merchant || "Credit Card Purchase",
+        status: "success"
+      }).returning();
+      return transaction;
+    });
+  }
+
+  async creditCardPayment(cardId: number, fromAccountId: number, amount: string): Promise<Transaction> {
+    return await db.transaction(async (tx) => {
+      const [card] = await tx.select().from(creditCards).where(eq(creditCards.id, cardId));
+      if (!card) throw new Error("Credit card not found");
+
+      const [account] = await tx.select().from(accounts).where(eq(accounts.id, fromAccountId));
+      if (!account) throw new Error("Account not found");
+
+      const amt = parseFloat(amount);
+      if (parseFloat(account.balance) < amt) throw new Error("Insufficient funds in source account");
+
+      const currentBal = parseFloat(card.currentBalance);
+      const paymentAmount = Math.min(amt, currentBal);
+
+      const newCardBalance = (currentBal - paymentAmount).toFixed(2);
+      await tx.update(creditCards).set({ currentBalance: newCardBalance }).where(eq(creditCards.id, cardId));
+
+      const newAccountBalance = (parseFloat(account.balance) - paymentAmount).toFixed(2);
+      await tx.update(accounts).set({ balance: newAccountBalance }).where(eq(accounts.id, fromAccountId));
+
+      const [transaction] = await tx.insert(transactions).values({
+        reference: `CC-PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        type: "credit_card_payment",
+        amount: paymentAmount.toFixed(2),
+        fromAccountId,
+        creditCardId: cardId,
+        narration: `Credit Card Payment - ****${card.lastFour}`,
+        status: "success"
+      }).returning();
+      return transaction;
+    });
+  }
+
+  async getTransactionsByCreditCardId(cardId: number): Promise<Transaction[]> {
+    return await db.select().from(transactions)
+      .where(eq(transactions.creditCardId, cardId))
+      .orderBy(desc(transactions.createdAt));
   }
 
   async createAuditLog(actorUserId: number | undefined, action: string, ipAddress?: string, metadata?: any): Promise<AuditLog> {

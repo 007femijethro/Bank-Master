@@ -295,6 +295,64 @@ export async function registerRoutes(
     res.json(apps);
   });
 
+  // Credit Card Routes
+  app.get("/api/credit-cards", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const cards = await storage.getCreditCardsByUserId(user.id);
+    res.json(cards);
+  });
+
+  app.get("/api/credit-cards/:id/transactions", requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const card = await storage.getCreditCard(Number(req.params.id));
+    if (!card || card.userId !== user.id) return res.status(404).json({ message: "Card not found" });
+    const txns = await storage.getTransactionsByCreditCardId(card.id);
+    res.json(txns);
+  });
+
+  app.post("/api/credit-cards/:id/purchase", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.status === 'frozen') return res.status(403).json({ message: "Account frozen" });
+      const card = await storage.getCreditCard(Number(req.params.id));
+      if (!card || card.userId !== user.id) return res.status(404).json({ message: "Card not found" });
+      const { amount, merchant } = req.body;
+      if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ message: "Invalid amount" });
+      const tx = await storage.creditCardPurchase(card.id, amount, merchant);
+      await storage.createAuditLog(user.id, "CC_PURCHASE", req.ip, { cardId: card.id, amount, merchant });
+      res.status(201).json(tx);
+    } catch (err: any) { res.status(400).json({ message: err.message }); }
+  });
+
+  app.post("/api/credit-cards/:id/payment", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.status === 'frozen') return res.status(403).json({ message: "Account frozen" });
+      const card = await storage.getCreditCard(Number(req.params.id));
+      if (!card || card.userId !== user.id) return res.status(404).json({ message: "Card not found" });
+      const { amount, fromAccountId } = req.body;
+      if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ message: "Invalid amount" });
+      const account = await storage.getAccount(fromAccountId);
+      if (!account || account.userId !== user.id) return res.status(403).json({ message: "Not your account" });
+      const tx = await storage.creditCardPayment(card.id, fromAccountId, amount);
+      await storage.createAuditLog(user.id, "CC_PAYMENT", req.ip, { cardId: card.id, amount, fromAccountId });
+      res.status(201).json(tx);
+    } catch (err: any) { res.status(400).json({ message: err.message }); }
+  });
+
+  app.get("/api/admin/credit-cards", requireStaff, async (req, res) => {
+    const cards = await storage.getAllCreditCards();
+    const cardsWithUsers = await Promise.all(cards.map(async (card) => {
+      const user = await storage.getUser(card.userId);
+      if (user) {
+        const { password, ...safeUser } = user as any;
+        return { ...card, user: safeUser };
+      }
+      return { ...card, user: null };
+    }));
+    res.json(cardsWithUsers);
+  });
+
   // Seed data
   const staffUser = await storage.getUserByUsername("staff@demo.com");
   if (!staffUser) {

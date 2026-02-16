@@ -43,14 +43,33 @@ export const accounts = pgTable("accounts", {
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   reference: text("reference").notNull().unique(),
-  type: text("type", { enum: ["deposit", "transfer", "billpay", "adjustment_credit", "adjustment_debit", "mobile_deposit"] }).notNull(),
+  type: text("type", { enum: ["deposit", "transfer", "billpay", "adjustment_credit", "adjustment_debit", "mobile_deposit", "credit_card_purchase", "credit_card_payment"] }).notNull(),
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
   fromAccountId: integer("from_account_id"),
   toAccountId: integer("to_account_id"),
+  creditCardId: integer("credit_card_id"),
   narration: text("narration"),
   reasonCode: text("reason_code"),
   staffUserId: integer("staff_user_id"),
   status: text("status", { enum: ["pending", "success", "failed"] }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const creditCards = pgTable("credit_cards", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  applicationId: integer("application_id"),
+  cardNumber: text("card_number").notNull(),
+  lastFour: text("last_four").notNull(),
+  cardholderName: text("cardholder_name").notNull(),
+  cardType: text("card_type", { enum: ["rewards", "travel", "low_interest", "secured", "student"] }).notNull(),
+  creditLimit: decimal("credit_limit", { precision: 15, scale: 2 }).notNull(),
+  currentBalance: decimal("current_balance", { precision: 15, scale: 2 }).default("0.00").notNull(),
+  apr: decimal("apr", { precision: 5, scale: 2 }).notNull(),
+  cvv: text("cvv").notNull(),
+  expirationMonth: integer("expiration_month").notNull(),
+  expirationYear: integer("expiration_year").notNull(),
+  status: text("status", { enum: ["active", "frozen", "closed", "pending_activation"] }).default("active").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -93,6 +112,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   auditLogs: many(auditLogs),
   mobileDeposits: many(mobileDeposits),
   cryptoHoldings: many(cryptoHoldings),
+  creditCards: many(creditCards),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -122,6 +142,22 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
     references: [accounts.id],
     relationName: "toAccount",
   }),
+  creditCard: one(creditCards, {
+    fields: [transactions.creditCardId],
+    references: [creditCards.id],
+  }),
+}));
+
+export const creditCardsRelations = relations(creditCards, ({ one, many }) => ({
+  user: one(users, {
+    fields: [creditCards.userId],
+    references: [users.id],
+  }),
+  application: one(accountApplications, {
+    fields: [creditCards.applicationId],
+    references: [accountApplications.id],
+  }),
+  transactions: many(transactions),
 }));
 
 export const mobileDepositsRelations = relations(mobileDeposits, ({ one }) => ({
@@ -147,6 +183,7 @@ export const cryptoHoldingsRelations = relations(cryptoHoldings, ({ one }) => ({
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memberNumber: true });
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true, createdAt: true, accountNumber: true, balance: true, status: true });
 export const insertApplicationSchema = createInsertSchema(accountApplications).omit({ id: true, createdAt: true, status: true, rejectionReason: true });
+export const insertCreditCardSchema = createInsertSchema(creditCards).omit({ id: true, createdAt: true });
 
 // === EXPLICIT API CONTRACT TYPES ===
 
@@ -157,6 +194,7 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 export type AccountApplication = typeof accountApplications.$inferSelect;
 export type MobileDeposit = typeof mobileDeposits.$inferSelect;
 export type CryptoHolding = typeof cryptoHoldings.$inferSelect;
+export type CreditCard = typeof creditCards.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertApplication = z.infer<typeof insertApplicationSchema>;
