@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ShieldCheck, Lock } from "lucide-react";
+import { Loader2, ShieldCheck, Lock, CheckCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -30,6 +31,7 @@ export default function AuthPage() {
   const { user, login, register } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("login");
+  const [registrationPending, setRegistrationPending] = useState(false);
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -42,7 +44,7 @@ export default function AuthPage() {
   });
 
   if (user) {
-    return <Redirect to={user.role === 'admin' ? '/admin' : '/dashboard'} />;
+    return <Redirect to={user.role === 'staff' ? '/admin' : '/dashboard'} />;
   }
 
   function onLogin(data: z.infer<typeof loginSchema>) {
@@ -59,6 +61,11 @@ export default function AuthPage() {
 
   function onRegister(data: z.infer<typeof registerSchema>) {
     register.mutate(data, {
+      onSuccess: (response: any) => {
+        if (response.pending) {
+          setRegistrationPending(true);
+        }
+      },
       onError: (e) => {
         toast({
           variant: "destructive",
@@ -135,83 +142,110 @@ export default function AuthPage() {
             <Card className="border-t-4 border-t-primary shadow-xl">
               <CardHeader>
                 <CardTitle>Create Account</CardTitle>
-                <CardDescription>Join SecureBank today and take control of your finances.</CardDescription>
+                <CardDescription>Apply for RFCU membership. Your application will be reviewed by staff.</CardDescription>
               </CardHeader>
               <CardContent>
-                <Form {...registerForm}>
-                  <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
-                    <FormField
-                      control={registerForm.control}
-                      name="fullName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Full Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="John Doe" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input placeholder="john@example.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="+234..." {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={registerForm.control}
-                        name="username"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Username</FormLabel>
-                            <FormControl>
-                              <Input placeholder="johndoe" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={registerForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Password</FormLabel>
-                            <FormControl>
-                              <Input type="password" placeholder="••••••••" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                {registrationPending ? (
+                  <div className="text-center space-y-4 py-4" data-testid="registration-pending">
+                    <div className="flex justify-center">
+                      <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                        <CheckCircle className="w-8 h-8 text-green-600" />
+                      </div>
                     </div>
-                    <Button type="submit" className="w-full" disabled={register.isPending}>
-                      {register.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Create Account"}
+                    <h3 className="text-lg font-semibold">Application Submitted</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Your membership application has been submitted successfully. A staff member will review and approve your account shortly.
+                    </p>
+                    <Alert className="text-left">
+                      <Clock className="h-4 w-4" />
+                      <AlertTitle>What happens next?</AlertTitle>
+                      <AlertDescription>
+                        Once a staff member approves your application, you'll be able to log in with your credentials. You'll receive access to all RFCU member services.
+                      </AlertDescription>
+                    </Alert>
+                    <Button variant="outline" className="w-full" onClick={() => { setRegistrationPending(false); setActiveTab("login"); }} data-testid="button-back-to-login">
+                      Back to Login
                     </Button>
-                  </form>
-                </Form>
+                  </div>
+                ) : (
+                  <Form {...registerForm}>
+                    <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="fullName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Full Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="John Doe" {...field} data-testid="input-register-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input placeholder="john@example.com" {...field} data-testid="input-register-email" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone Number</FormLabel>
+                            <FormControl>
+                              <Input placeholder="555-123-4567" {...field} data-testid="input-register-phone" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={registerForm.control}
+                          name="username"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Username</FormLabel>
+                              <FormControl>
+                                <Input placeholder="johndoe" {...field} data-testid="input-register-username" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={registerForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Password</FormLabel>
+                              <FormControl>
+                                <Input type="password" placeholder="Min. 6 characters" {...field} data-testid="input-register-password" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        By registering, your application will be reviewed by RFCU staff before activation.
+                      </p>
+                      <Button type="submit" className="w-full" disabled={register.isPending} data-testid="button-submit-register">
+                        {register.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Submit Application"}
+                      </Button>
+                    </form>
+                  </Form>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

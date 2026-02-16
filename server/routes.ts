@@ -32,11 +32,8 @@ export async function registerRoutes(
       const hashedPassword = await storage.hashPassword(input.password);
       const user = await storage.createUser({ ...input, password: hashedPassword });
       await storage.createAuditLog(user.id, "REGISTER", req.ip);
-      req.login(user, (err) => {
-        if (err) return next(err);
-        const { password: _pw, ...safeUser } = user as any;
-        res.status(201).json(safeUser);
-      });
+      const { password: _pw, ...safeUser } = user as any;
+      res.status(201).json({ ...safeUser, pending: true, message: "Your membership application has been submitted. A staff member will review and approve your account." });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
       next(err);

@@ -53,10 +53,15 @@ export function useAuth() {
         body: JSON.stringify(data),
         credentials: "include",
       });
-      return handleResponse(res, api.auth.register.responses[201]);
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData([api.auth.me.path], data);
+      if (!res.ok) {
+        let errorMessage = "An error occurred";
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch {}
+        throw new Error(errorMessage);
+      }
+      return res.json();
     },
   });
 

@@ -55,6 +55,10 @@ export function setupAuth(app: Express) {
           return done(null, false, { message: "Account is frozen." });
         }
 
+        if (user.status === "pending") {
+          return done(null, false, { message: "Your membership is pending approval. A staff member will review your application shortly." });
+        }
+
         const isValid = await storage.comparePasswords(password, user.password);
         if (!isValid) {
           return done(null, false, { message: "Incorrect password." });

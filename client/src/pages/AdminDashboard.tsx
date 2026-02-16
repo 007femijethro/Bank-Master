@@ -63,13 +63,13 @@ export default function AdminDashboard() {
     return <Redirect to="/dashboard" />;
   }
 
-  const handleStatusToggle = (userId: number, currentStatus: string) => {
-    const newStatus = currentStatus === 'active' ? 'frozen' : 'active';
+  const handleStatusChange = (userId: number, newStatus: string) => {
     updateUserStatus.mutate({ id: userId, status: newStatus as any }, {
       onSuccess: () => {
+        const labels: Record<string, string> = { active: "Approved", frozen: "Frozen", pending: "Set to Pending" };
         toast({
-          title: `User ${newStatus === 'active' ? 'Unfrozen' : 'Frozen'}`,
-          description: `User status has been updated to ${newStatus}.`
+          title: `Member ${labels[newStatus] || newStatus}`,
+          description: `Member status has been updated to ${newStatus}.`
         });
       },
       onError: (e) => {
@@ -132,7 +132,11 @@ export default function AdminDashboard() {
 
       <Tabs defaultValue="users" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="users" data-testid="tab-admin-users">Members</TabsTrigger>
+          <TabsTrigger value="users" data-testid="tab-admin-users">Members
+            {users?.filter((u: any) => u.status === 'pending').length ? (
+              <Badge variant="destructive" className="ml-2">{users.filter((u: any) => u.status === 'pending').length}</Badge>
+            ) : null}
+          </TabsTrigger>
           <TabsTrigger value="applications" data-testid="tab-admin-apps">Applications
             {applications?.filter((a: any) => a.status === 'pending').length ? (
               <Badge variant="destructive" className="ml-2">{applications.filter((a: any) => a.status === 'pending').length}</Badge>
@@ -173,52 +177,74 @@ export default function AdminDashboard() {
                             <div className="text-xs text-muted-foreground">{u.email}</div>
                           </td>
                           <td className="p-3">
-                            <Badge variant={u.status === 'active' ? 'outline' : 'destructive'}>
+                            <Badge variant={u.status === 'active' ? 'outline' : u.status === 'pending' ? 'secondary' : 'destructive'}>
                               {u.status}
                             </Badge>
                           </td>
                           <td className="p-3 text-right space-x-2">
-                            <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
-                              <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" onClick={() => setSelectedAccountId(u.id)} data-testid={`button-adjust-${u.id}`}>
-                                  <DollarSign className="w-4 h-4 mr-1" /> Adjust
+                            {u.status === 'pending' && u.role !== 'staff' && (
+                              <>
+                                <Button 
+                                  variant="default" 
+                                  size="sm"
+                                  onClick={() => handleStatusChange(u.id, 'active')}
+                                  data-testid={`button-approve-member-${u.id}`}
+                                >
+                                  <UserCheck className="w-4 h-4 mr-1" /> Approve
                                 </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Adjust Member Balance</DialogTitle>
-                                  <DialogDescription>Add or remove funds from member accounts.</DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4 py-4">
-                                  <div className="space-y-2">
-                                    <Label>Adjustment Type</Label>
-                                    <Select value={adjustType} onValueChange={(v) => setAdjustType(v as any)}>
-                                      <SelectTrigger><SelectValue /></SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="adjustment_credit">Add Funds (Credit)</SelectItem>
-                                        <SelectItem value="adjustment_debit">Remove Funds (Debit)</SelectItem>
-                                      </SelectContent>
-                                    </Select>
+                                <Button 
+                                  variant="destructive" 
+                                  size="sm"
+                                  onClick={() => handleStatusChange(u.id, 'frozen')}
+                                  data-testid={`button-reject-member-${u.id}`}
+                                >
+                                  <UserX className="w-4 h-4 mr-1" /> Reject
+                                </Button>
+                              </>
+                            )}
+                            {u.status !== 'pending' && (
+                              <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm" onClick={() => setSelectedAccountId(u.id)} data-testid={`button-adjust-${u.id}`}>
+                                    <DollarSign className="w-4 h-4 mr-1" /> Adjust
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Adjust Member Balance</DialogTitle>
+                                    <DialogDescription>Add or remove funds from member accounts.</DialogDescription>
+                                  </DialogHeader>
+                                  <div className="space-y-4 py-4">
+                                    <div className="space-y-2">
+                                      <Label>Adjustment Type</Label>
+                                      <Select value={adjustType} onValueChange={(v) => setAdjustType(v as any)}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="adjustment_credit">Add Funds (Credit)</SelectItem>
+                                          <SelectItem value="adjustment_debit">Remove Funds (Debit)</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Amount ($)</Label>
+                                      <Input type="number" placeholder="0.00" value={adjustAmount} onChange={(e) => setAdjustAmount(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Reason Code</Label>
+                                      <Input placeholder="e.g., CORRECTION, FEE_REFUND" value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} />
+                                    </div>
                                   </div>
-                                  <div className="space-y-2">
-                                    <Label>Amount ($)</Label>
-                                    <Input type="number" placeholder="0.00" value={adjustAmount} onChange={(e) => setAdjustAmount(e.target.value)} />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label>Reason Code</Label>
-                                    <Input placeholder="e.g., CORRECTION, FEE_REFUND" value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} />
-                                  </div>
-                                </div>
-                                <DialogFooter>
-                                  <Button onClick={handleAdjustBalance} data-testid="button-apply-adjustment">Apply Adjustment</Button>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
-                            {u.role !== 'staff' && (
+                                  <DialogFooter>
+                                    <Button onClick={handleAdjustBalance} data-testid="button-apply-adjustment">Apply Adjustment</Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                            )}
+                            {u.role !== 'staff' && u.status !== 'pending' && (
                               <Button 
                                 variant={u.status === 'active' ? "destructive" : "outline"} 
                                 size="sm"
-                                onClick={() => handleStatusToggle(u.id, u.status)}
+                                onClick={() => handleStatusChange(u.id, u.status === 'active' ? 'frozen' : 'active')}
                                 data-testid={`button-toggle-status-${u.id}`}
                               >
                                 {u.status === 'active' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
