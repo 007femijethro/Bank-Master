@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type LoginRequest, type RegisterUserRequest } from "@shared/routes";
+import { api } from "@shared/routes";
 import { z } from "zod";
 
 // Helper to handle API validation failures
@@ -31,7 +31,7 @@ export function useAuth() {
   });
 
   const loginMutation = useMutation({
-    mutationFn: async (data: LoginRequest) => {
+    mutationFn: async (data: z.infer<typeof api.auth.login.input>) => {
       const res = await fetch(api.auth.login.path, {
         method: api.auth.login.method,
         headers: { "Content-Type": "application/json" },
@@ -46,7 +46,7 @@ export function useAuth() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: RegisterUserRequest) => {
+    mutationFn: async (data: z.infer<typeof api.auth.register.input>) => {
       const res = await fetch(api.auth.register.path, {
         method: api.auth.register.method,
         headers: { "Content-Type": "application/json" },

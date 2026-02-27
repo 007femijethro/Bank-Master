@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type DepositRequest, type TransferRequest, type BillPayRequest } from "@shared/routes";
+import { api } from "@shared/routes";
 import { z } from "zod";
 
 async function handleResponse<T>(res: Response, schema: z.ZodSchema<T>): Promise<T> {
@@ -30,7 +30,7 @@ export function useTransactions(accountId?: number) {
 export function useDeposit() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: DepositRequest) => {
+    mutationFn: async (data: z.infer<typeof api.transactions.deposit.input>) => {
       const res = await fetch(api.transactions.deposit.path, {
         method: api.transactions.deposit.method,
         headers: { "Content-Type": "application/json" },
@@ -49,7 +49,7 @@ export function useDeposit() {
 export function useTransfer() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: TransferRequest) => {
+    mutationFn: async (data: z.infer<typeof api.transactions.transfer.input>) => {
       const res = await fetch(api.transactions.transfer.path, {
         method: api.transactions.transfer.method,
         headers: { "Content-Type": "application/json" },
@@ -68,7 +68,7 @@ export function useTransfer() {
 export function useBillPay() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: BillPayRequest) => {
+    mutationFn: async (data: z.infer<typeof api.transactions.billpay.input>) => {
       const res = await fetch(api.transactions.billpay.path, {
         method: api.transactions.billpay.method,
         headers: { "Content-Type": "application/json" },

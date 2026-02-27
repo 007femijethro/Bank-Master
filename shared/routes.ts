@@ -295,6 +295,12 @@ export const api = {
 
 export type CreateAccountRequest = z.infer<typeof api.accounts.create.input>;
 
+export type LoginRequest = z.infer<typeof api.auth.login.input>;
+export type RegisterUserRequest = z.infer<typeof api.auth.register.input>;
+export type DepositRequest = z.infer<typeof api.transactions.deposit.input>;
+export type TransferRequest = z.infer<typeof api.transactions.transfer.input>;
+export type BillPayRequest = z.infer<typeof api.transactions.billpay.input>;
+
 export function buildUrl(path: string, params?: Record<string, string | number>): string {
   let url = path;
   if (params) {
