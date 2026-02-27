@@ -259,6 +259,11 @@ export async function registerRoutes(
     res.json(allUsers.map(({ password, ...u }) => u));
   });
 
+  app.get(api.admin.auditLogs.path, requireStaff, async (_req, res) => {
+    const logs = await storage.getAuditLogs();
+    res.json(logs);
+  });
+
   app.patch(api.admin.updateUserStatus.path, requireStaff, async (req, res) => {
     try {
       const id = Number(req.params.id);

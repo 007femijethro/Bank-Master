@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useAdminUsers, useUpdateUserStatus, useAuditLogs, useAdminApplications, useUpdateApplication, useAdjustBalance } from "@/hooks/use-admin";
-import { Redirect } from "wouter";
+import { Redirect, useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const [location] = useLocation();
   const { data: users, isLoading: loadingUsers } = useAdminUsers();
   const { data: logs, isLoading: loadingLogs } = useAuditLogs();
   const { data: applications, isLoading: loadingApps } = useAdminApplications();
@@ -123,6 +124,8 @@ export default function AdminDashboard() {
     ));
   };
 
+  const defaultTab = location === "/admin/logs" ? "logs" : "users";
+
   return (
     <div className="space-y-8">
       <div>
@@ -130,7 +133,7 @@ export default function AdminDashboard() {
         <p className="text-muted-foreground">Manage members, applications, mobile deposits, and account adjustments</p>
       </div>
 
-      <Tabs defaultValue="users" className="space-y-6">
+      <Tabs key={defaultTab} defaultValue={defaultTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="users" data-testid="tab-admin-users">Members
             {users?.filter((u: any) => u.status === 'pending').length ? (
