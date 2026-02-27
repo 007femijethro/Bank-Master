@@ -135,7 +135,7 @@ export async function registerRoutes(
       const input = api.transactions.transfer.input.parse(req.body);
       const user = req.user as any;
       if (user.status === 'frozen') return res.status(403).json({ message: "User is frozen" });
-      const tx = await storage.transfer(input.fromAccountId, input.toAccountNumber, input.amount, input.narration);
+      const tx = await storage.transfer(input.fromAccountId, input.toAccountNumber, input.amount, input.narration, input.rail);
       await storage.createAuditLog(user.id, "TRANSFER", req.ip, { amount: input.amount });
       await storage.createNotification(user.id, "transfer_posted", `Transfer of $${input.amount} has posted.`, { transactionId: tx.id });
       res.status(201).json(tx);
@@ -369,7 +369,8 @@ export async function registerRoutes(
 
   app.get("/api/admin/pending-transactions", requireStaff, async (_req, res) => {
     const pending = await storage.getPendingTransactionsByTypes(["deposit", "billpay"]);
-    const withUsers = await Promise.all(pending.map(async (tx) => {
+    const railPending = (await storage.getAllTransactions()).filter((tx) => tx.status === "pending" && (tx.type === "transfer" || tx.type === "fee_assessment"));
+    const withUsers = await Promise.all([...pending, ...railPending].map(async (tx) => {
       const accountId = tx.type === "deposit" ? tx.toAccountId : tx.fromAccountId;
       const account = accountId ? await storage.getAccount(accountId) : undefined;
       const user = account ? await storage.getUser(account.userId) : undefined;
