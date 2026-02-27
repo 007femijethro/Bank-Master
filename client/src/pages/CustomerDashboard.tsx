@@ -85,6 +85,17 @@ export default function CustomerDashboard() {
 
   const totalBalance = accounts?.reduce((sum, acc) => sum + Number(acc.balance), 0) || 0;
   const recentTransactions = transactions?.slice(0, 5) || [];
+  const userAccountIds = new Set((accounts || []).map((acc) => acc.id));
+
+  const isCreditTransaction = (tx: any) => {
+    const toMine = tx.toAccountId ? userAccountIds.has(tx.toAccountId) : false;
+    const fromMine = tx.fromAccountId ? userAccountIds.has(tx.fromAccountId) : false;
+
+    if (toMine && !fromMine) return true;
+    if (fromMine && !toMine) return false;
+
+    return tx.type === "deposit" || tx.type === "adjustment_credit";
+  };
 
   const currentWidgets = user?.dashboardWidgets || ["balance", "activity", "cards", "crypto", "home_equity"];
 
@@ -351,15 +362,15 @@ export default function CustomerDashboard() {
                       <div key={tx.id} className="flex items-center justify-between p-4">
                         <div className="flex items-center gap-4">
                           <div className={`p-2 rounded-full ${tx.type.includes('adjustment') ? 'bg-purple-100 text-purple-600' : 'bg-muted'}`}>
-                            {tx.amount.toString().startsWith('-') ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
+                            {isCreditTransaction(tx) ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                           </div>
                           <div>
                             <p className="font-medium text-sm capitalize">{tx.type.replace('_', ' ')}</p>
                             <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt || new Date()), "MMM d, h:mm a")}</p>
                           </div>
                         </div>
-                        <div className={`font-bold text-sm ${tx.type.includes('credit') || tx.type === 'deposit' ? 'text-green-600' : ''}`}>
-                          ${Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        <div className={`font-bold text-sm ${isCreditTransaction(tx) ? 'text-green-600' : 'text-foreground'}`}>
+                          {isCreditTransaction(tx) ? '+' : '-'}${Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </div>
                       </div>
                     ))}

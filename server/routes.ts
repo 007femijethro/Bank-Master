@@ -284,6 +284,26 @@ export async function registerRoutes(
     res.json(logs);
   });
 
+
+  app.get(api.admin.memberFinancials.path, requireStaff, async (_req, res) => {
+    const allUsers = await storage.getAllUsers();
+    const memberUsers = allUsers.filter((u) => u.role !== "staff");
+    const financials = await Promise.all(memberUsers.map(async (u) => {
+      const userAccounts = await storage.getAccountsByUserId(u.id);
+      const cryptoHoldings = await storage.getCryptoHoldingsByUserId(u.id);
+      const totalBalance = userAccounts.reduce((sum, acc) => sum + Number(acc.balance), 0).toFixed(2);
+      return {
+        userId: u.id,
+        totalBalance,
+        assetCount: userAccounts.length + cryptoHoldings.length,
+        accountCount: userAccounts.length,
+        cryptoAssetCount: cryptoHoldings.length,
+      };
+    }));
+
+    res.json(financials);
+  });
+
   app.patch(api.admin.updateUserStatus.path, requireStaff, async (req, res) => {
     try {
       const id = Number(req.params.id);

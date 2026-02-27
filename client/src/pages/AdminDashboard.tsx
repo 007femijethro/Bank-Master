@@ -22,6 +22,7 @@ export default function AdminDashboard() {
   const { data: users, isLoading: loadingUsers } = useAdminUsers();
   const { data: logs, isLoading: loadingLogs } = useAuditLogs();
   const { data: applications, isLoading: loadingApps } = useAdminApplications();
+  const { data: memberFinancials, isLoading: loadingMemberFinancials } = useMemberFinancials();
   const updateUserStatus = useUpdateUserStatus();
   const updateApplication = useUpdateApplication();
   const adjustBalance = useAdjustBalance();
@@ -87,6 +88,8 @@ export default function AdminDashboard() {
       toast({ title: "Deposit Reviewed", description: "Mobile deposit has been processed." });
     },
   });
+
+  const financialByUserId = new Map((memberFinancials || []).map((f) => [f.userId, f]));
 
   if (user?.role !== 'staff') {
     return <Redirect to="/dashboard" />;
@@ -190,7 +193,7 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Member Management</CardTitle>
-              <CardDescription>View members and adjust balances.</CardDescription>
+              <CardDescription>View members, balances, assets, and adjust balances.</CardDescription>
             </CardHeader>
             <CardContent>
               {loadingUsers ? (
@@ -202,6 +205,8 @@ export default function AdminDashboard() {
                       <tr className="border-b bg-muted/50">
                         <th className="p-3 text-left font-medium">Member</th>
                         <th className="p-3 text-left font-medium">Status</th>
+                        <th className="p-3 text-left font-medium">Total Balance</th>
+                        <th className="p-3 text-left font-medium">Assets</th>
                         <th className="p-3 text-right font-medium">Actions</th>
                       </tr>
                     </thead>
@@ -216,6 +221,24 @@ export default function AdminDashboard() {
                             <Badge variant={u.status === 'active' ? 'outline' : u.status === 'pending' ? 'secondary' : 'destructive'}>
                               {u.status}
                             </Badge>
+                          </td>
+                          <td className="p-3">
+                            {loadingMemberFinancials ? (
+                              <span className="text-xs text-muted-foreground">Loading...</span>
+                            ) : (
+                              <span className="font-medium">
+                                ${Number(financialByUserId.get(u.id)?.totalBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-xs text-muted-foreground">
+                            {loadingMemberFinancials ? (
+                              <span>Loading...</span>
+                            ) : (
+                              <span>
+                                {(financialByUserId.get(u.id)?.assetCount || 0)} total ({financialByUserId.get(u.id)?.accountCount || 0} accounts, {financialByUserId.get(u.id)?.cryptoAssetCount || 0} crypto)
+                              </span>
+                            )}
                           </td>
                           <td className="p-3 text-right space-x-2">
                             {u.status === 'pending' && u.role !== 'staff' && (
@@ -399,6 +422,8 @@ export default function AdminDashboard() {
                         <th className="p-3 text-left font-medium">Amount</th>
                         <th className="p-3 text-left font-medium">Date</th>
                         <th className="p-3 text-left font-medium">Status</th>
+                        <th className="p-3 text-left font-medium">Total Balance</th>
+                        <th className="p-3 text-left font-medium">Assets</th>
                         <th className="p-3 text-right font-medium">Actions</th>
                       </tr>
                     </thead>
