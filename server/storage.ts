@@ -59,7 +59,7 @@ export interface IStorage {
   getAccount(id: number): Promise<Account | undefined>;
   getAccountByNumber(accountNumber: string): Promise<Account | undefined>;
   getAccountsByUserId(userId: number): Promise<Account[]>;
-  createAccount(userId: number, type: "share_savings" | "checking"): Promise<Account>;
+  createAccount(userId: number, type: "share_savings" | "checking", initialBalance?: string): Promise<Account>;
   
   createApplication(app: InsertApplication & { userId: number }): Promise<AccountApplication>;
   getApplications(): Promise<AccountApplication[]>;
@@ -154,7 +154,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(accounts).where(eq(accounts.userId, userId));
   }
 
-  async createAccount(userId: number, type: "share_savings" | "checking"): Promise<Account> {
+  async createAccount(userId: number, type: "share_savings" | "checking", initialBalance = "0.00"): Promise<Account> {
     let accountNumber = "";
     let isUnique = false;
     while (!isUnique) {
@@ -168,8 +168,8 @@ export class DatabaseStorage implements IStorage {
       accountNumber,
       type,
       currency: "USD",
-      balance: "0.00",
-      availableBalance: "0.00",
+      balance: initialBalance,
+      availableBalance: initialBalance,
       status: "active"
     }).returning();
     return account;
