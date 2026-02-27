@@ -8,7 +8,7 @@
     "build": "NODE_OPTIONS=--dns-result-order=ipv4first tsx script/build.ts",
     "start": "NODE_OPTIONS=--dns-result-order=ipv4first NODE_ENV=production node dist/index.cjs",
     "check": "NODE_OPTIONS=--dns-result-order=ipv4first tsc",
-    "db:push": "NODE_OPTIONS=--dns-result-order=ipv4first drizzle-kit push"
+    "db:push": "NODE_OPTIONS=--dns-result-order=ipv4first drizzle-kit push --force"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
