@@ -228,8 +228,6 @@ export class DatabaseStorage implements IStorage {
   async billpay(fromAccountId: number, billerType: string, amount: string, narration?: string): Promise<Transaction> {
     const [account] = await db.select().from(accounts).where(eq(accounts.id, fromAccountId));
     if (!account) throw new Error("Account not found");
-    const amt = parseFloat(amount);
-    if (parseFloat(account.balance) < amt) throw new Error("Insufficient funds");
 
     const [transaction] = await db.insert(transactions).values({
       reference: `BP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -280,7 +278,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       const [updatedTransaction] = await tx.update(transactions)
-        .set({ status: finalStatus, narration: updatedNarration, staffUserId: reviewedBy, reasonCode: status === "approved" ? "STAFF_APPROVED" : "STAFF_REJECTED" })
+        .set({ status: finalStatus, narration: updatedNarration })
         .where(eq(transactions.id, id))
         .returning();
 

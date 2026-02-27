@@ -361,7 +361,7 @@ export async function registerRoutes(
   });
 
 
-  app.get(api.admin.pendingTransactions.path, requireStaff, async (_req, res) => {
+  app.get("/api/admin/pending-transactions", requireStaff, async (_req, res) => {
     const pending = await storage.getPendingTransactionsByTypes(["deposit", "billpay"]);
     const withUsers = await Promise.all(pending.map(async (tx) => {
       const accountId = tx.type === "deposit" ? tx.toAccountId : tx.fromAccountId;
@@ -372,12 +372,15 @@ export async function registerRoutes(
     res.json(withUsers);
   });
 
-  app.patch(api.admin.reviewTransaction.path, requireStaff, async (req, res) => {
+  app.patch("/api/admin/transactions/:id/review", requireStaff, async (req, res) => {
     try {
       const user = req.user as any;
-      const input = api.admin.reviewTransaction.input.parse(req.body);
-      const tx = await storage.reviewTransaction(Number(req.params.id), input.status, user.id, input.reason);
-      await storage.createAuditLog(user.id, `TRANSACTION_${input.status.toUpperCase()}`, req.ip, { transactionId: tx.id, type: tx.type });
+      const status = req.body.status as "approved" | "rejected";
+      if (status !== "approved" && status !== "rejected") {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      const tx = await storage.reviewTransaction(Number(req.params.id), status, user.id, req.body.reason);
+      await storage.createAuditLog(user.id, `TRANSACTION_${status.toUpperCase()}`, req.ip, { transactionId: tx.id, type: tx.type });
       res.json(tx);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
   });
