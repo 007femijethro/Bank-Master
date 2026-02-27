@@ -215,7 +215,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(accountApplications.id, id))
         .returning();
       
-      if (status === "approved" && (app.type === "share_savings" || app.type === "checking")) {
+      if (status === "approved" && (app.type === "share_savings" || app.type === "checking" || app.type === "loan" || app.type === "home_equity")) {
         await this.createAccount(app.userId, app.type as any);
       }
 
