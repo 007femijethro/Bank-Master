@@ -307,20 +307,6 @@ export const api = {
         403: errorSchemas.forbidden,
       },
     },
-    memberFinancials: {
-      method: 'GET' as const,
-      path: '/api/admin/member-financials' as const,
-      responses: {
-        200: z.array(z.object({
-          userId: z.number(),
-          totalBalance: z.string(),
-          assetCount: z.number(),
-          accountCount: z.number(),
-          cryptoAssetCount: z.number(),
-        })),
-        403: errorSchemas.forbidden,
-      },
-    },
   },
 };
 
