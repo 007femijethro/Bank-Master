@@ -6,6 +6,26 @@ import { promisify } from "util";
 
 const scryptAsync = promisify(scrypt);
 
+
+type TransferRail = "internal" | "ach" | "wire" | "card";
+
+const TRANSFER_RAIL_CONFIG: Record<TransferRail, { settlementHours: number; cutoffHourUtc: number; maxAmount: number; feeAmount: number }> = {
+  internal: { settlementHours: 0, cutoffHourUtc: 23, maxAmount: 100000, feeAmount: 0 },
+  ach: { settlementHours: 24, cutoffHourUtc: 21, maxAmount: 25000, feeAmount: 0 },
+  wire: { settlementHours: 2, cutoffHourUtc: 20, maxAmount: 100000, feeAmount: 15 },
+  card: { settlementHours: 1, cutoffHourUtc: 23, maxAmount: 5000, feeAmount: 1.5 },
+};
+
+function buildSettlementDate(rail: TransferRail): Date {
+  const now = new Date();
+  const cfg = TRANSFER_RAIL_CONFIG[rail];
+  const estimate = new Date(now.getTime() + cfg.settlementHours * 60 * 60 * 1000);
+  if (now.getUTCHours() >= cfg.cutoffHourUtc) {
+    estimate.setUTCDate(estimate.getUTCDate() + 1);
+  }
+  return estimate;
+}
+
 function toAmount(value: string | number): number {
   return Number.parseFloat(String(value));
 }
@@ -33,7 +53,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUserStatus(id: number, status: "active" | "frozen"): Promise<User>;
+  updateUserStatus(id: number, status: "active" | "frozen" | "locked"): Promise<User>;
   getAllUsers(): Promise<User[]>;
 
   getAccount(id: number): Promise<Account | undefined>;
@@ -52,7 +72,7 @@ export interface IStorage {
   postPendingTransactionsForSettlement(): Promise<number>;
   
   deposit(accountId: number, amount: string, narration?: string): Promise<Transaction>;
-  transfer(fromAccountId: number, toAccountNumber: string, amount: string, narration?: string): Promise<Transaction>;
+  transfer(fromAccountId: number, toAccountNumber: string, amount: string, narration?: string, rail?: TransferRail): Promise<Transaction>;
   billpay(fromAccountId: number, billerType: string, amount: string, narration?: string): Promise<Transaction>;
   reviewTransaction(id: number, status: "approved" | "rejected", reviewedBy: number, reason?: string): Promise<Transaction>;
   adjustBalance(accountId: number, amount: string, type: "adjustment_credit" | "adjustment_debit", staffUserId: number, reasonCode: string, narration?: string): Promise<Transaction>;
@@ -111,7 +131,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserStatus(id: number, status: "active" | "frozen"): Promise<User> {
+  async updateUserStatus(id: number, status: "active" | "frozen" | "locked"): Promise<User> {
     const [user] = await db.update(users).set({ status }).where(eq(users.id, id)).returning();
     return user;
   }
@@ -156,7 +176,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createApplication(app: InsertApplication & { userId: number }): Promise<AccountApplication> {
-    const [application] = await db.insert(accountApplications).values(app).returning();
+    const formData = app.formData || {};
+    const annualIncome = Number(formData.annualIncome || 0);
+    const existingDebt = Number(formData.existingDebt || 0);
+    const requestedLimit = Number(formData.requestedLimit || 0);
+    const dti = annualIncome > 0 ? ((existingDebt + requestedLimit) / annualIncome) : 1;
+    const riskScore = Math.min(100, Math.round(dti * 100));
+
+    const autoReject = app.type === "credit_card" && (annualIncome <= 0 || dti > 0.55);
+    const status = autoReject ? "rejected" : "pending";
+    const underwritingDecisionReason = autoReject
+      ? `Auto-rejected: DTI ${(dti * 100).toFixed(1)}% exceeds policy threshold`
+      : `Pending underwriter review. Estimated DTI ${(dti * 100).toFixed(1)}%`;
+
+    const [application] = await db.insert(accountApplications).values({
+      ...app,
+      status,
+      riskScore,
+      underwritingDecisionReason,
+      adverseActionNote: autoReject ? "Please reduce existing obligations or request a lower credit amount and reapply." : null,
+      rejectionReason: autoReject ? "Debt-to-income ratio too high for requested product." : null,
+    }).returning();
     return application;
   }
 
@@ -214,7 +254,7 @@ export class DatabaseStorage implements IStorage {
 
     let count = 0;
     for (const row of pending) {
-      if (row.type === "deposit" || row.type === "billpay") {
+      if (["deposit", "billpay", "transfer", "fee_assessment"].includes(row.type)) {
         await this.reviewTransaction(row.id, "approved", 0, "Auto-posted settlement");
         count += 1;
       }
@@ -238,32 +278,63 @@ export class DatabaseStorage implements IStorage {
     return transaction;
   }
 
-  async transfer(fromAccountId: number, toAccountNumber: string, amount: string, narration?: string): Promise<Transaction> {
+  async transfer(fromAccountId: number, toAccountNumber: string, amount: string, narration?: string, rail: TransferRail = "internal"): Promise<Transaction> {
     return await db.transaction(async (tx) => {
       const [fromAccount] = await tx.select().from(accounts).where(eq(accounts.id, fromAccountId));
       const [toAccount] = await tx.select().from(accounts).where(eq(accounts.accountNumber, toAccountNumber));
       if (!fromAccount || !toAccount) throw new Error("Account not found");
       const amt = toAmount(amount);
-      if (toAmount(fromAccount.availableBalance) < amt) throw new Error("Insufficient available funds");
-      const newFromBalance = fixed2(toAmount(fromAccount.balance) - amt);
-      const newToBalance = fixed2(toAmount(toAccount.balance) + amt);
-      const newFromAvailable = fixed2(toAmount(fromAccount.availableBalance) - amt);
-      const newToAvailable = fixed2(toAmount(toAccount.availableBalance) + amt);
-      await tx.update(accounts).set({ balance: newFromBalance, availableBalance: newFromAvailable }).where(eq(accounts.id, fromAccountId));
-      await tx.update(accounts).set({ balance: newToBalance, availableBalance: newToAvailable }).where(eq(accounts.id, toAccount.id));
+      const cfg = TRANSFER_RAIL_CONFIG[rail];
+      if (!cfg) throw new Error("Unsupported transfer rail");
+      if (amt > cfg.maxAmount) throw new Error(`Amount exceeds ${rail.toUpperCase()} transfer limit of $${cfg.maxAmount.toFixed(2)}`);
+
+      const fee = cfg.feeAmount;
+      const totalDebit = amt + fee;
+      if (toAmount(fromAccount.availableBalance) < totalDebit) throw new Error("Insufficient available funds");
+
+      const pendingSettlement = rail !== "internal";
+      const newFromAvailable = fixed2(toAmount(fromAccount.availableBalance) - totalDebit);
+      await tx.update(accounts).set({ availableBalance: newFromAvailable }).where(eq(accounts.id, fromAccountId));
+
+      if (!pendingSettlement) {
+        const newFromBalance = fixed2(toAmount(fromAccount.balance) - totalDebit);
+        const newToBalance = fixed2(toAmount(toAccount.balance) + amt);
+        const newToAvailable = fixed2(toAmount(toAccount.availableBalance) + amt);
+        await tx.update(accounts).set({ balance: newFromBalance }).where(eq(accounts.id, fromAccountId));
+        await tx.update(accounts).set({ balance: newToBalance, availableBalance: newToAvailable }).where(eq(accounts.id, toAccount.id));
+      }
+
+      const settlementEstimatedAt = buildSettlementDate(rail);
       const [transaction] = await tx.insert(transactions).values({
         reference: `TRF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         type: "transfer",
         amount,
         fromAccountId,
         toAccountId: toAccount.id,
-        rail: "internal",
+        rail,
         effectiveDate: new Date(),
-        postedAt: new Date(),
+        settlementEstimatedAt,
+        postedAt: pendingSettlement ? null : new Date(),
         counterparty: toAccount.accountNumber,
         narration: narration || `Transfer to ${toAccount.accountNumber}`,
-        status: "posted"
+        status: pendingSettlement ? "pending" : "posted"
       }).returning();
+
+      if (fee > 0) {
+        await tx.insert(transactions).values({
+          reference: `FEE-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          type: "fee_assessment",
+          amount: fee.toFixed(2),
+          fromAccountId,
+          rail: "internal",
+          effectiveDate: new Date(),
+          postedAt: pendingSettlement ? null : new Date(),
+          parentTransactionId: transaction.id,
+          narration: `${rail.toUpperCase()} transfer fee`,
+          reasonCode: `${rail}_fee`,
+          status: pendingSettlement ? "pending" : "posted"
+        });
+      }
       return transaction;
     });
   }
@@ -290,7 +361,7 @@ export class DatabaseStorage implements IStorage {
       const [existing] = await tx.select().from(transactions).where(eq(transactions.id, id));
       if (!existing) throw new Error("Transaction not found");
       if (existing.status !== "pending") throw new Error("Transaction has already been reviewed");
-      if (existing.type !== "deposit" && existing.type !== "billpay") throw new Error("Only deposit and bill pay transactions can be reviewed");
+      if (!["deposit", "billpay", "transfer", "fee_assessment"].includes(existing.type)) throw new Error("Only pending deposit, bill pay, transfer, or fee transactions can be reviewed");
 
       const finalStatus = status === "approved" ? "posted" : "returned";
       const reasonSuffix = reason ? ` (${reason})` : "";
@@ -319,8 +390,36 @@ export class DatabaseStorage implements IStorage {
           await tx.update(accounts).set({ balance: newBalance, availableBalance: newAvailable }).where(eq(accounts.id, account.id));
         }
 
+        if (existing.type === "transfer") {
+          if (!existing.fromAccountId || !existing.toAccountId) throw new Error("Transfer account details are missing");
+          const [fromAccount] = await tx.select().from(accounts).where(eq(accounts.id, existing.fromAccountId));
+          const [toAccount] = await tx.select().from(accounts).where(eq(accounts.id, existing.toAccountId));
+          if (!fromAccount || !toAccount) throw new Error("Account not found");
+          const amt = toAmount(existing.amount);
+          const newFromBalance = fixed2(toAmount(fromAccount.balance) - amt);
+          const newToBalance = fixed2(toAmount(toAccount.balance) + amt);
+          const newToAvailable = fixed2(toAmount(toAccount.availableBalance) + amt);
+          await tx.update(accounts).set({ balance: newFromBalance }).where(eq(accounts.id, fromAccount.id));
+          await tx.update(accounts).set({ balance: newToBalance, availableBalance: newToAvailable }).where(eq(accounts.id, toAccount.id));
+        }
+
+        if (existing.type === "fee_assessment") {
+          if (!existing.fromAccountId) throw new Error("Fee source account is missing");
+          const [account] = await tx.select().from(accounts).where(eq(accounts.id, existing.fromAccountId));
+          if (!account) throw new Error("Account not found");
+          const newBalance = fixed2(toAmount(account.balance) - toAmount(existing.amount));
+          await tx.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, account.id));
+        }
+
         updatedNarration = `${existing.narration || existing.type} (approved by staff #${reviewedBy})`;
       } else {
+        if (existing.type === "transfer" || existing.type === "fee_assessment") {
+          if (!existing.fromAccountId) throw new Error("Source account is missing");
+          const [account] = await tx.select().from(accounts).where(eq(accounts.id, existing.fromAccountId));
+          if (!account) throw new Error("Account not found");
+          const newAvailable = fixed2(toAmount(account.availableBalance) + toAmount(existing.amount));
+          await tx.update(accounts).set({ availableBalance: newAvailable }).where(eq(accounts.id, account.id));
+        }
         updatedNarration = `${existing.narration || existing.type} (rejected by staff #${reviewedBy}${reasonSuffix})`;
       }
 
@@ -734,13 +833,35 @@ export class DatabaseStorage implements IStorage {
   async createStatement(accountId: number, periodStart: Date, periodEnd: Date): Promise<Statement> {
     const [account] = await db.select().from(accounts).where(eq(accounts.id, accountId));
     if (!account) throw new Error("Account not found");
+
+    const accountTransactions = await db.select().from(transactions)
+      .where(and(
+        or(eq(transactions.fromAccountId, accountId), eq(transactions.toAccountId, accountId)),
+        eq(transactions.status, "posted")
+      ));
+
+    let totalCredits = 0;
+    let totalDebits = 0;
+    for (const tx of accountTransactions) {
+      const postedAt = tx.postedAt || tx.createdAt;
+      if (!postedAt || postedAt < periodStart || postedAt > periodEnd) continue;
+      const amount = toAmount(tx.amount);
+      if (tx.toAccountId === accountId) totalCredits += amount;
+      if (tx.fromAccountId === accountId) totalDebits += amount;
+    }
+
+    const closingBalance = toAmount(account.balance);
+    const openingBalance = closingBalance - totalCredits + totalDebits;
+
     const artifactUrl = `/statements/${accountId}/${periodStart.toISOString().slice(0, 10)}-${periodEnd.toISOString().slice(0, 10)}.html`;
     const [statement] = await db.insert(statements).values({
       accountId,
       periodStart,
       periodEnd,
-      openingBalance: account.balance,
-      closingBalance: account.balance,
+      openingBalance: fixed2(openingBalance),
+      totalCredits: fixed2(totalCredits),
+      totalDebits: fixed2(totalDebits),
+      closingBalance: fixed2(closingBalance),
       artifactUrl,
     }).returning();
     return statement;

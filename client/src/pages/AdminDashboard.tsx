@@ -98,7 +98,7 @@ export default function AdminDashboard() {
   const handleStatusChange = (userId: number, newStatus: string) => {
     updateUserStatus.mutate({ id: userId, status: newStatus as any }, {
       onSuccess: () => {
-        const labels: Record<string, string> = { active: "Approved", frozen: "Frozen", pending: "Set to Pending" };
+        const labels: Record<string, string> = { active: "Approved", frozen: "Frozen", locked: "Locked", pending: "Set to Pending" };
         toast({
           title: `Member ${labels[newStatus] || newStatus}`,
           description: `Member status has been updated to ${newStatus}.`
@@ -219,7 +219,7 @@ export default function AdminDashboard() {
                           </td>
                           <td className="p-3">
                             <Badge variant={u.status === 'active' ? 'outline' : u.status === 'pending' ? 'secondary' : 'destructive'}>
-                              {u.status}
+                              {u.status === "locked" ? "locked - login blocked" : u.status}
                             </Badge>
                           </td>
                           <td className="p-3">
@@ -300,14 +300,24 @@ export default function AdminDashboard() {
                               </Dialog>
                             )}
                             {u.role !== 'staff' && u.status !== 'pending' && (
-                              <Button 
-                                variant={u.status === 'active' ? "destructive" : "outline"} 
-                                size="sm"
-                                onClick={() => handleStatusChange(u.id, u.status === 'active' ? 'frozen' : 'active')}
-                                data-testid={`button-toggle-status-${u.id}`}
-                              >
-                                {u.status === 'active' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                              </Button>
+                              <>
+                                <Button 
+                                  variant={u.status === 'active' ? "destructive" : "outline"} 
+                                  size="sm"
+                                  onClick={() => handleStatusChange(u.id, u.status === 'active' ? 'frozen' : 'active')}
+                                  data-testid={`button-toggle-status-${u.id}`}
+                                >
+                                  {u.status === 'active' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                                </Button>
+                                <Button
+                                  variant={u.status === 'locked' ? "outline" : "secondary"}
+                                  size="sm"
+                                  onClick={() => handleStatusChange(u.id, u.status === 'locked' ? 'active' : 'locked')}
+                                  data-testid={`button-toggle-lock-${u.id}`}
+                                >
+                                  <ShieldAlert className="w-4 h-4 mr-1" /> {u.status === 'locked' ? 'Unlock' : 'Lock'}
+                                </Button>
+                              </>
                             )}
                           </td>
                         </tr>

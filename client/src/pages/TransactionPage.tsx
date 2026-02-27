@@ -131,7 +131,7 @@ export default function TransactionPage() {
                   <SelectContent>
                     {accounts?.map((acc) => (
                       <SelectItem key={acc.id} value={String(acc.id)}>
-                        {acc.type.replace('_', ' ')} - {acc.accountNumber} (${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                        {acc.type.replace('_', ' ')} - {acc.accountNumber} (Current: ${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })} | Available: ${Number(acc.availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -175,7 +175,7 @@ export default function TransactionPage() {
                   <SelectContent>
                     {accounts?.map((acc) => (
                       <SelectItem key={acc.id} value={String(acc.id)}>
-                        {acc.type.replace('_', ' ')} - {acc.accountNumber} (${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                        {acc.type.replace('_', ' ')} - {acc.accountNumber} (Current: ${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })} | Available: ${Number(acc.availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -241,7 +241,7 @@ export default function TransactionPage() {
                   <SelectContent>
                     {accounts?.map((acc) => (
                       <SelectItem key={acc.id} value={String(acc.id)}>
-                        {acc.type.replace('_', ' ')} - {acc.accountNumber} (${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                        {acc.type.replace('_', ' ')} - {acc.accountNumber} (Current: ${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })} | Available: ${Number(acc.availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })})
                       </SelectItem>
                     ))}
                   </SelectContent>

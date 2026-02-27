@@ -28,7 +28,7 @@ export function useAdminUsers() {
 export function useUpdateUserStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, status }: { id: number, status: "active" | "frozen" }) => {
+    mutationFn: async ({ id, status }: { id: number, status: "active" | "frozen" | "locked" }) => {
       const url = buildUrl(api.admin.updateUserStatus.path, { id });
       const res = await fetch(url, {
         method: api.admin.updateUserStatus.method,

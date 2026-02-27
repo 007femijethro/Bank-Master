@@ -119,7 +119,8 @@ export const api = {
         fromAccountId: z.number(),
         toAccountNumber: z.string(),
         amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
-        narration: z.string().optional()
+        narration: z.string().optional(),
+        rail: z.enum(["internal", "ach", "wire", "card"]).optional()
       }),
       responses: {
         201: z.custom<typeof transactions.$inferSelect>(),
@@ -133,7 +134,7 @@ export const api = {
         fromAccountId: z.number(),
         billerType: z.string(),
         amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
-        narration: z.string().optional()
+        narration: z.string().optional(),
       }),
       responses: {
         201: z.custom<typeof transactions.$inferSelect>(),
@@ -280,7 +281,7 @@ export const api = {
     updateUserStatus: {
       method: 'PATCH' as const,
       path: '/api/admin/users/:id/status' as const,
-      input: z.object({ status: z.enum(["active", "frozen"]) }),
+      input: z.object({ status: z.enum(["active", "frozen", "locked"]) }),
       responses: {
         200: z.custom<typeof users.$inferSelect>(),
         403: errorSchemas.forbidden,
