@@ -215,14 +215,8 @@ export class DatabaseStorage implements IStorage {
         .where(eq(accountApplications.id, id))
         .returning();
       
-      if (status === "approved" && (app.type === "share_savings" || app.type === "checking")) {
-        await this.createAccount(app.userId, app.type);
-      }
-
-      if (status === "approved" && (app.type === "loan" || app.type === "home_equity")) {
-        const requestedAmount = Number(app.formData?.requestedAmount || 0);
-        const openingBalance = requestedAmount > 0 ? fixed2(requestedAmount) : "0.00";
-        await this.createAccount(app.userId, app.type as any, openingBalance);
+      if (status === "approved" && (app.type === "share_savings" || app.type === "checking" || app.type === "loan" || app.type === "home_equity")) {
+        await this.createAccount(app.userId, app.type as any);
       }
 
       if (status === "approved" && app.type === "credit_card") {
