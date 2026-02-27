@@ -53,6 +53,16 @@ export function useAuditLogs() {
   });
 }
 
+export function useMemberFinancials() {
+  return useQuery({
+    queryKey: [api.admin.memberFinancials.path],
+    queryFn: async () => {
+      const res = await fetch(api.admin.memberFinancials.path);
+      return handleResponse(res, api.admin.memberFinancials.responses[200]);
+    },
+  });
+}
+
 export function useAdminApplications() {
   return useQuery({
     queryKey: [api.admin.applications.path],

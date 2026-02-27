@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useAdminUsers, useUpdateUserStatus, useAuditLogs, useAdminApplications, useUpdateApplication, useAdjustBalance, usePendingTransactions, useReviewPendingTransaction } from "@/hooks/use-admin";
+import { useAdminUsers, useUpdateUserStatus, useAuditLogs, useMemberFinancials, useAdminApplications, useUpdateApplication, useAdjustBalance } from "@/hooks/use-admin";
 import { Redirect, useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
