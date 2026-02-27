@@ -46,10 +46,10 @@ export default function TransactionPage() {
       narration: narration || "Deposit",
     }, {
       onSuccess: () => {
-        toast({ title: "Deposit Successful", description: `$${amount} added to your account.` });
+        toast({ title: "Deposit Submitted", description: `Your $${amount} deposit is pending admin approval.` });
         resetForm();
       },
-      onError: (e) => toast({ variant: "destructive", title: "Deposit Failed", description: e.message })
+      onError: (e) => toast({ variant: "destructive", title: "Deposit Submission Failed", description: e.message })
     });
   };
 
@@ -78,10 +78,10 @@ export default function TransactionPage() {
       narration: narration || `Bill Payment - ${billerType}`,
     }, {
       onSuccess: () => {
-        toast({ title: "Payment Successful", description: `Paid $${amount} for ${billerType}.` });
+        toast({ title: "Payment Submitted", description: `Your $${amount} bill payment for ${billerType} is pending admin approval.` });
         resetForm();
       },
-      onError: (e) => toast({ variant: "destructive", title: "Payment Failed", description: e.message })
+      onError: (e) => toast({ variant: "destructive", title: "Payment Submission Failed", description: e.message })
     });
   };
 
@@ -119,7 +119,7 @@ export default function TransactionPage() {
           <Card>
             <CardHeader>
               <CardTitle>Deposit Funds</CardTitle>
-              <CardDescription>Add money to your account instantly.</CardDescription>
+              <CardDescription>Deposits are submitted for admin review and will post after approval.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-w-md">
               <div className="space-y-2">
@@ -229,7 +229,7 @@ export default function TransactionPage() {
           <Card>
             <CardHeader>
               <CardTitle>Pay Bills</CardTitle>
-              <CardDescription>Pay for utilities and services directly.</CardDescription>
+              <CardDescription>Bill payments are submitted for admin review before posting.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-w-md">
               <div className="space-y-2">
@@ -255,10 +255,23 @@ export default function TransactionPage() {
                     <SelectValue placeholder="Select biller" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="airtime">Airtime Recharge</SelectItem>
-                    <SelectItem value="internet">Internet Data</SelectItem>
-                    <SelectItem value="electricity">Electricity Bill</SelectItem>
-                    <SelectItem value="cable">Cable TV</SelectItem>
+                    <SelectItem value="electricity">Electric Utility</SelectItem>
+                    <SelectItem value="water">Water Utility</SelectItem>
+                    <SelectItem value="gas">Natural Gas</SelectItem>
+                    <SelectItem value="internet">Internet Service</SelectItem>
+                    <SelectItem value="mobile">Mobile Phone</SelectItem>
+                    <SelectItem value="insurance_auto">Auto Insurance</SelectItem>
+                    <SelectItem value="insurance_home">Home Insurance</SelectItem>
+                    <SelectItem value="insurance_health">Health Insurance</SelectItem>
+                    <SelectItem value="mortgage">Mortgage</SelectItem>
+                    <SelectItem value="rent">Rent</SelectItem>
+                    <SelectItem value="credit_card">Credit Card</SelectItem>
+                    <SelectItem value="student_loan">Student Loan</SelectItem>
+                    <SelectItem value="car_loan">Auto Loan</SelectItem>
+                    <SelectItem value="medical">Medical Bill</SelectItem>
+                    <SelectItem value="property_tax">Property Tax</SelectItem>
+                    <SelectItem value="hoa">HOA Dues</SelectItem>
+                    <SelectItem value="streaming">Streaming Services</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
