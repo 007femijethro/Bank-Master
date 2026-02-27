@@ -125,6 +125,7 @@ export async function registerRoutes(
       if (!account || account.userId !== user.id) return res.status(403).json({ message: "Account not found or not owned by you" });
       const tx = await storage.deposit(input.accountId, input.amount, input.narration);
       await storage.createAuditLog(user.id, "DEPOSIT_SUBMIT", req.ip, { amount: input.amount, transactionId: tx.id });
+      await storage.createNotification(user.id, "deposit_submitted", `Deposit of $${input.amount} submitted and pending posting.`, { transactionId: tx.id });
       res.status(201).json(tx);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
   });
@@ -136,6 +137,7 @@ export async function registerRoutes(
       if (user.status === 'frozen') return res.status(403).json({ message: "User is frozen" });
       const tx = await storage.transfer(input.fromAccountId, input.toAccountNumber, input.amount, input.narration);
       await storage.createAuditLog(user.id, "TRANSFER", req.ip, { amount: input.amount });
+      await storage.createNotification(user.id, "transfer_posted", `Transfer of $${input.amount} has posted.`, { transactionId: tx.id });
       res.status(201).json(tx);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
   });
@@ -269,6 +271,7 @@ export async function registerRoutes(
       if (!account || account.userId !== user.id) return res.status(403).json({ message: "Account not found or not owned by you" });
       const tx = await storage.billpay(input.fromAccountId, input.billerType, input.amount, input.narration);
       await storage.createAuditLog(user.id, "BILL_PAY_SUBMIT", req.ip, { amount: input.amount, transactionId: tx.id, billerType: input.billerType });
+      await storage.createNotification(user.id, "billpay_submitted", `Bill payment of $${input.amount} is pending posting.`, { transactionId: tx.id });
       res.status(201).json(tx);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
   });
@@ -356,6 +359,9 @@ export async function registerRoutes(
       const user = req.user as any;
       const deposit = await storage.reviewMobileDeposit(Number(req.params.id), req.body.status, user.id, req.body.reason);
       await storage.createAuditLog(user.id, `MOBILE_DEPOSIT_${req.body.status.toUpperCase()}`, req.ip, { depositId: deposit.id });
+      if (req.body.status === "approved") {
+        await storage.createNotification(deposit.userId, "mobile_deposit_approved", `Your mobile deposit of $${deposit.amount} was approved and is pending hold release.`, { depositId: deposit.id });
+      }
       res.json(deposit);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
   });
@@ -381,8 +387,59 @@ export async function registerRoutes(
       }
       const tx = await storage.reviewTransaction(Number(req.params.id), status, user.id, req.body.reason);
       await storage.createAuditLog(user.id, `TRANSACTION_${status.toUpperCase()}`, req.ip, { transactionId: tx.id, type: tx.type });
+      if (tx.toAccountId) {
+        const account = await storage.getAccount(tx.toAccountId);
+        if (account) {
+          await storage.createNotification(account.userId, "transaction_reviewed", `Transaction ${tx.reference} is now ${tx.status}.`, { transactionId: tx.id });
+        }
+      }
       res.json(tx);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
+  });
+
+  app.post(api.transactions.settlePending.path, requireStaff, async (_req, res) => {
+    const postedCount = await storage.postPendingTransactionsForSettlement();
+    res.json({ postedCount });
+  });
+
+  app.get(api.holds.list.path, requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const accountId = Number(req.params.accountId);
+    const account = await storage.getAccount(accountId);
+    if (!account || (user.role !== "staff" && account.userId !== user.id)) return res.status(403).json({ message: "Forbidden" });
+    const accountHolds = await storage.getHoldsByAccountId(accountId);
+    res.json(accountHolds);
+  });
+
+  app.get(api.statements.list.path, requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const accountId = Number(req.params.accountId);
+    const account = await storage.getAccount(accountId);
+    if (!account || (user.role !== "staff" && account.userId !== user.id)) return res.status(403).json({ message: "Forbidden" });
+    const result = await storage.getStatementsByAccountId(accountId);
+    res.json(result);
+  });
+
+  app.post(api.statements.create.path, requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const accountId = Number(req.params.accountId);
+    const account = await storage.getAccount(accountId);
+    if (!account || (user.role !== "staff" && account.userId !== user.id)) return res.status(403).json({ message: "Forbidden" });
+    const input = api.statements.create.input.parse(req.body);
+    const statement = await storage.createStatement(accountId, new Date(input.periodStart), new Date(input.periodEnd));
+    res.status(201).json(statement);
+  });
+
+  app.get(api.notifications.list.path, requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const result = await storage.getNotificationsByUserId(user.id);
+    res.json(result);
+  });
+
+  app.patch(api.notifications.markRead.path, requireAuth, async (req, res) => {
+    const user = req.user as any;
+    const result = await storage.markNotificationRead(Number(req.params.id), user.id);
+    res.json(result);
   });
 
   // User profile/widget routes

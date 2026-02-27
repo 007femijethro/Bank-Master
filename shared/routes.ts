@@ -140,6 +140,59 @@ export const api = {
         400: errorSchemas.validation,
       },
     },
+    settlePending: {
+      method: 'POST' as const,
+      path: '/api/admin/transactions/settle-pending' as const,
+      responses: {
+        200: z.object({ postedCount: z.number() }),
+        403: errorSchemas.forbidden,
+      },
+    },
+  },
+  holds: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/holds' as const,
+      responses: {
+        200: z.array(z.any()),
+      },
+    },
+  },
+  statements: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/accounts/:accountId/statements' as const,
+      responses: {
+        200: z.array(z.any()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/accounts/:accountId/statements' as const,
+      input: z.object({
+        periodStart: z.string(),
+        periodEnd: z.string(),
+      }),
+      responses: {
+        201: z.any(),
+      },
+    },
+  },
+  notifications: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/notifications' as const,
+      responses: {
+        200: z.array(z.any()),
+      },
+    },
+    markRead: {
+      method: 'PATCH' as const,
+      path: '/api/notifications/:id/read' as const,
+      responses: {
+        200: z.any(),
+      },
+    },
   },
   mobileDeposit: {
     create: {
