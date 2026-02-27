@@ -45,9 +45,32 @@ export default function AdminDashboard() {
   });
 
 
-  const { data: pendingTransactions, isLoading: loadingPendingTransactions } = usePendingTransactions();
+  const { data: pendingTransactions, isLoading: loadingPendingTransactions } = useQuery({
+    queryKey: ["/api/admin/pending-transactions"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/pending-transactions");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
 
-  const reviewPendingTransaction = useReviewPendingTransaction();
+  const reviewPendingTransaction = useMutation({
+    mutationFn: async ({ id, status, reason }: { id: number; status: "approved" | "rejected"; reason?: string }) => {
+      const res = await fetch(`/api/admin/transactions/${id}/review`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, reason }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      toast({ title: "Transaction Reviewed", description: "Pending transaction has been processed." });
+    },
+  });
 
   const reviewDeposit = useMutation({
     mutationFn: async ({ id, status, reason }: { id: number; status: string; reason?: string }) => {
@@ -456,10 +479,10 @@ export default function AdminDashboard() {
                           <td className="p-3 text-xs text-muted-foreground">{tx.account?.accountNumber || "N/A"}</td>
                           <td className="p-3 text-muted-foreground text-xs">{tx.createdAt ? format(new Date(tx.createdAt), "MMM d, yyyy h:mm a") : "N/A"}</td>
                           <td className="p-3 text-right space-x-2">
-                            <Button size="sm" variant="outline" onClick={() => reviewPendingTransaction.mutate({ id: tx.id, status: "approved" }, { onSuccess: () => toast({ title: "Transaction Approved", description: "Pending transaction has been approved." }), onError: (e) => toast({ variant: "destructive", title: "Review Failed", description: e.message }) })}>
+                            <Button size="sm" variant="outline" onClick={() => reviewPendingTransaction.mutate({ id: tx.id, status: "approved" })}>
                               <Check className="w-4 h-4 mr-1" /> Approve
                             </Button>
-                            <Button size="sm" variant="destructive" onClick={() => reviewPendingTransaction.mutate({ id: tx.id, status: "rejected", reason: "Declined by staff" }, { onSuccess: () => toast({ title: "Transaction Rejected", description: "Pending transaction has been rejected." }), onError: (e) => toast({ variant: "destructive", title: "Review Failed", description: e.message }) })}>
+                            <Button size="sm" variant="destructive" onClick={() => reviewPendingTransaction.mutate({ id: tx.id, status: "rejected", reason: "Declined by staff" })}>
                               <X className="w-4 h-4 mr-1" /> Reject
                             </Button>
                           </td>
