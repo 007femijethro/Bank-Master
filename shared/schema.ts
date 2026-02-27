@@ -157,7 +157,7 @@ export const userSessions = pgTable("user_sessions", {
 
 export const auditLogs = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
-  eventId: text("event_id"),
+  eventId: text("event_id").notNull().unique(),
   correlationId: text("correlation_id"),
   actorUserId: integer("actor_user_id"),
   actorType: text("actor_type", { enum: ["member", "staff", "system"] }).default("system").notNull(),
