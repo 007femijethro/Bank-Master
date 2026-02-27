@@ -88,8 +88,12 @@ export async function registerRoutes(
   });
 
   const requireAuth = (req: any, res: any, next: any) => {
-    if (req.isAuthenticated()) return next();
-    res.status(401).send();
+    if (!req.isAuthenticated()) return res.status(401).send();
+    if (req.user?.status === "locked") {
+      req.logout(() => {});
+      return res.status(403).json({ message: "Your account is locked. Please contact support." });
+    }
+    return next();
   };
 
   const requireStaff = (req: any, res: any, next: any) => {

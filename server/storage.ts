@@ -53,7 +53,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUserStatus(id: number, status: "active" | "frozen"): Promise<User>;
+  updateUserStatus(id: number, status: "active" | "frozen" | "locked"): Promise<User>;
   getAllUsers(): Promise<User[]>;
 
   getAccount(id: number): Promise<Account | undefined>;
@@ -131,7 +131,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserStatus(id: number, status: "active" | "frozen"): Promise<User> {
+  async updateUserStatus(id: number, status: "active" | "frozen" | "locked"): Promise<User> {
     const [user] = await db.update(users).set({ status }).where(eq(users.id, id)).returning();
     return user;
   }

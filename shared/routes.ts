@@ -281,7 +281,7 @@ export const api = {
     updateUserStatus: {
       method: 'PATCH' as const,
       path: '/api/admin/users/:id/status' as const,
-      input: z.object({ status: z.enum(["active", "frozen"]) }),
+      input: z.object({ status: z.enum(["active", "frozen", "locked"]) }),
       responses: {
         200: z.custom<typeof users.$inferSelect>(),
         403: errorSchemas.forbidden,

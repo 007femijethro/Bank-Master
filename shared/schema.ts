@@ -18,7 +18,7 @@ export const users = pgTable("users", {
   state: text("state"),
   zipCode: text("zip_code"),
   role: text("role", { enum: ["member", "staff"] }).default("member").notNull(),
-  status: text("status", { enum: ["active", "frozen", "pending"] }).default("pending").notNull(),
+  status: text("status", { enum: ["active", "frozen", "locked", "pending"] }).default("pending").notNull(),
   memberNumber: text("member_number").unique(),
   dashboardWidgets: jsonb("dashboard_widgets").$type<string[]>().default(["balance", "routing", "activity", "cards"]).notNull(),
   avatarUrl: text("avatar_url"),

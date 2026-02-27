@@ -341,8 +341,13 @@ export default function CustomerDashboard() {
                   <Badge variant="outline" className="bg-green-50 text-green-700">{acc.status}</Badge>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                  <p className="text-xs text-muted-foreground mt-1 font-mono">{acc.accountNumber}</p>
+                  <div className="space-y-1">
+                    <div className="text-sm text-muted-foreground">Current Balance</div>
+                    <div className="text-2xl font-bold">${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                    <div className="text-sm text-muted-foreground mt-2">Available Balance</div>
+                    <div className="text-lg font-semibold">${Number(acc.availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2 font-mono">{acc.accountNumber}</p>
                 </CardContent>
               </Card>
             ))
