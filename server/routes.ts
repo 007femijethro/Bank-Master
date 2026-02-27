@@ -121,8 +121,10 @@ export async function registerRoutes(
       const input = api.transactions.deposit.input.parse(req.body);
       const user = req.user as any;
       if (user.status === 'frozen') return res.status(403).json({ message: "User is frozen" });
+      const account = await storage.getAccount(input.accountId);
+      if (!account || account.userId !== user.id) return res.status(403).json({ message: "Account not found or not owned by you" });
       const tx = await storage.deposit(input.accountId, input.amount, input.narration);
-      await storage.createAuditLog(user.id, "DEPOSIT", req.ip, { amount: input.amount });
+      await storage.createAuditLog(user.id, "DEPOSIT_SUBMIT", req.ip, { amount: input.amount, transactionId: tx.id });
       res.status(201).json(tx);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
   });
@@ -263,8 +265,10 @@ export async function registerRoutes(
       const input = api.transactions.billpay.input.parse(req.body);
       const user = req.user as any;
       if (user.status === 'frozen') return res.status(403).json({ message: "User is frozen" });
+      const account = await storage.getAccount(input.fromAccountId);
+      if (!account || account.userId !== user.id) return res.status(403).json({ message: "Account not found or not owned by you" });
       const tx = await storage.billpay(input.fromAccountId, input.billerType, input.amount, input.narration);
-      await storage.createAuditLog(user.id, "BILL_PAY", req.ip, { amount: input.amount });
+      await storage.createAuditLog(user.id, "BILL_PAY_SUBMIT", req.ip, { amount: input.amount, transactionId: tx.id, billerType: input.billerType });
       res.status(201).json(tx);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
   });
@@ -333,6 +337,31 @@ export async function registerRoutes(
       const deposit = await storage.reviewMobileDeposit(Number(req.params.id), req.body.status, user.id, req.body.reason);
       await storage.createAuditLog(user.id, `MOBILE_DEPOSIT_${req.body.status.toUpperCase()}`, req.ip, { depositId: deposit.id });
       res.json(deposit);
+    } catch (err: any) { res.status(400).json({ message: err.message }); }
+  });
+
+
+  app.get("/api/admin/pending-transactions", requireStaff, async (_req, res) => {
+    const pending = await storage.getPendingTransactionsByTypes(["deposit", "billpay"]);
+    const withUsers = await Promise.all(pending.map(async (tx) => {
+      const accountId = tx.type === "deposit" ? tx.toAccountId : tx.fromAccountId;
+      const account = accountId ? await storage.getAccount(accountId) : undefined;
+      const user = account ? await storage.getUser(account.userId) : undefined;
+      return { ...tx, account, user };
+    }));
+    res.json(withUsers);
+  });
+
+  app.patch("/api/admin/transactions/:id/review", requireStaff, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const status = req.body.status as "approved" | "rejected";
+      if (status !== "approved" && status !== "rejected") {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      const tx = await storage.reviewTransaction(Number(req.params.id), status, user.id, req.body.reason);
+      await storage.createAuditLog(user.id, `TRANSACTION_${status.toUpperCase()}`, req.ip, { transactionId: tx.id, type: tx.type });
+      res.json(tx);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
   });
 
