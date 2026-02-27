@@ -43,19 +43,35 @@ export async function registerRoutes(
   app.post(api.auth.login.path, (req, res, next) => {
     passport.authenticate("local", async (err: any, user: any, info: any) => {
       if (err) return next(err);
-      if (!user) return res.status(401).json({ message: info?.message || "Login failed" });
+      if (!user) {
+        await storage.createAuditLog(undefined, "LOGIN_FAILED", req.ip, {
+          attemptedEmail: req.body?.username || req.body?.email || null,
+          reason: info?.message || "Login failed",
+        });
+        return res.status(401).json({ message: info?.message || "Login failed" });
+      }
       req.login(user, async (err) => {
         if (err) return next(err);
-        await storage.createAuditLog(user.id, "LOGIN_SUCCESS", req.ip);
+        await storage.createAuditLog(user.id, "LOGIN_SUCCESS", req.ip, {
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+        });
         const { password: _pw, ...safeUser } = user;
         return res.status(200).json(safeUser);
       });
     })(req, res, next);
   });
 
-  app.post(api.auth.logout.path, (req, res, next) => {
+  app.post(api.auth.logout.path, async (req, res, next) => {
     const user = req.user as any;
-    if (user) storage.createAuditLog(user.id, "LOGOUT", req.ip);
+    if (user) {
+      await storage.createAuditLog(user.id, "LOGOUT", req.ip, {
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+      });
+    }
     req.logout((err) => {
       if (err) return next(err);
       res.status(200).send();
