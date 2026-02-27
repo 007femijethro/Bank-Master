@@ -100,3 +100,45 @@ export function useAdjustBalance() {
     },
   });
 }
+
+
+export function usePendingTransactions() {
+  return useQuery({
+    queryKey: [api.admin.pendingTransactions.path],
+    queryFn: async () => {
+      const res = await fetch(api.admin.pendingTransactions.path);
+      return handleResponse(res, api.admin.pendingTransactions.responses[200]);
+    },
+  });
+}
+
+
+export function useMemberFinancials() {
+  return useQuery({
+    queryKey: [api.admin.memberFinancials.path],
+    queryFn: async () => {
+      const res = await fetch(api.admin.memberFinancials.path);
+      return handleResponse(res, api.admin.memberFinancials.responses[200]);
+    },
+  });
+}
+
+export function useReviewPendingTransaction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status, reason }: { id: number, status: "approved" | "rejected", reason?: string }) => {
+      const url = buildUrl(api.admin.reviewTransaction.path, { id });
+      const res = await fetch(url, {
+        method: api.admin.reviewTransaction.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, reason }),
+      });
+      return handleResponse(res, api.admin.reviewTransaction.responses[200]);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.admin.pendingTransactions.path] });
+      queryClient.invalidateQueries({ queryKey: [api.transactions.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.accounts.list.path] });
+    },
+  });
+}
