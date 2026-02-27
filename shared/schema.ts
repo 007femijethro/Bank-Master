@@ -187,7 +187,9 @@ export const cryptoHoldingsRelations = relations(cryptoHoldings, ({ one }) => ({
 
 // === BASE SCHEMAS ===
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memberNumber: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memberNumber: true }).extend({
+  dashboardWidgets: z.array(z.string()).optional(),
+});
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true, createdAt: true, accountNumber: true, balance: true, status: true });
 export const insertApplicationSchema = createInsertSchema(accountApplications).omit({ id: true, createdAt: true, status: true, rejectionReason: true });
 export const insertCreditCardSchema = createInsertSchema(creditCards).omit({ id: true, createdAt: true });
