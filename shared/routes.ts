@@ -290,6 +290,23 @@ export const api = {
         403: errorSchemas.forbidden,
       },
     },
+    pendingTransactions: {
+      method: 'GET' as const,
+      path: '/api/admin/pending-transactions' as const,
+      responses: {
+        200: z.array(z.any()),
+        403: errorSchemas.forbidden,
+      },
+    },
+    reviewTransaction: {
+      method: 'PATCH' as const,
+      path: '/api/admin/transactions/:id/review' as const,
+      input: z.object({ status: z.enum(["approved", "rejected"]), reason: z.string().optional() }),
+      responses: {
+        200: z.custom<typeof transactions.$inferSelect>(),
+        403: errorSchemas.forbidden,
+      },
+    },
   },
 };
 

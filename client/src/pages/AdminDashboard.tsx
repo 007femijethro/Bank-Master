@@ -1,12 +1,12 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useAdminUsers, useUpdateUserStatus, useAuditLogs, useAdminApplications, useUpdateApplication, useAdjustBalance } from "@/hooks/use-admin";
+import { useAdminUsers, useUpdateUserStatus, useAuditLogs, useAdminApplications, useUpdateApplication, useAdjustBalance, usePendingTransactions, useReviewPendingTransaction } from "@/hooks/use-admin";
 import { Redirect, useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, UserX, UserCheck, ShieldAlert, Check, X, DollarSign, Smartphone, Eye } from "lucide-react";
+import { Loader2, UserX, UserCheck, ShieldAlert, Check, X, DollarSign, Smartphone, Eye, Receipt } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -43,6 +43,11 @@ export default function AdminDashboard() {
       return res.json();
     },
   });
+
+
+  const { data: pendingTransactions, isLoading: loadingPendingTransactions } = usePendingTransactions();
+
+  const reviewPendingTransaction = useReviewPendingTransaction();
 
   const reviewDeposit = useMutation({
     mutationFn: async ({ id, status, reason }: { id: number; status: string; reason?: string }) => {
@@ -148,6 +153,11 @@ export default function AdminDashboard() {
           <TabsTrigger value="deposits" data-testid="tab-admin-deposits">Mobile Deposits
             {mobileDeposits?.filter((d: any) => d.status === 'pending').length ? (
               <Badge variant="destructive" className="ml-2">{mobileDeposits.filter((d: any) => d.status === 'pending').length}</Badge>
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="transaction-reviews" data-testid="tab-admin-transaction-reviews">Transaction Reviews
+            {pendingTransactions?.length ? (
+              <Badge variant="destructive" className="ml-2">{pendingTransactions.length}</Badge>
             ) : null}
           </TabsTrigger>
           <TabsTrigger value="logs" data-testid="tab-admin-logs">Audit Logs</TabsTrigger>
@@ -394,6 +404,64 @@ export default function AdminDashboard() {
                                 </Button>
                               </>
                             )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="transaction-reviews">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Receipt className="w-5 h-5" /> Deposit & Bill Pay Reviews</CardTitle>
+              <CardDescription>Approve or reject pending member deposits and bill payments.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingPendingTransactions ? (
+                <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>
+              ) : !pendingTransactions?.length ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Receipt className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                  <p>No pending deposit or bill pay transactions.</p>
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="p-3 text-left font-medium">Member</th>
+                        <th className="p-3 text-left font-medium">Type</th>
+                        <th className="p-3 text-left font-medium">Amount</th>
+                        <th className="p-3 text-left font-medium">Account</th>
+                        <th className="p-3 text-left font-medium">Date</th>
+                        <th className="p-3 text-right font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingTransactions.map((tx: any) => (
+                        <tr key={tx.id} className="border-b last:border-0">
+                          <td className="p-3">
+                            <div className="font-medium">{tx.user?.fullName || "Unknown"}</div>
+                            <div className="text-xs text-muted-foreground">{tx.user?.email || "N/A"}</div>
+                          </td>
+                          <td className="p-3">
+                            <Badge variant="outline" className="capitalize">{tx.type.replace('_', ' ')}</Badge>
+                          </td>
+                          <td className="p-3 font-medium">${Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                          <td className="p-3 text-xs text-muted-foreground">{tx.account?.accountNumber || "N/A"}</td>
+                          <td className="p-3 text-muted-foreground text-xs">{tx.createdAt ? format(new Date(tx.createdAt), "MMM d, yyyy h:mm a") : "N/A"}</td>
+                          <td className="p-3 text-right space-x-2">
+                            <Button size="sm" variant="outline" onClick={() => reviewPendingTransaction.mutate({ id: tx.id, status: "approved" }, { onSuccess: () => toast({ title: "Transaction Approved", description: "Pending transaction has been approved." }), onError: (e) => toast({ variant: "destructive", title: "Review Failed", description: e.message }) })}>
+                              <Check className="w-4 h-4 mr-1" /> Approve
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => reviewPendingTransaction.mutate({ id: tx.id, status: "rejected", reason: "Declined by staff" }, { onSuccess: () => toast({ title: "Transaction Rejected", description: "Pending transaction has been rejected." }), onError: (e) => toast({ variant: "destructive", title: "Review Failed", description: e.message }) })}>
+                              <X className="w-4 h-4 mr-1" /> Reject
+                            </Button>
                           </td>
                         </tr>
                       ))}

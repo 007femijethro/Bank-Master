@@ -1,6 +1,6 @@
 import { users, accounts, transactions, auditLogs, accountApplications, mobileDeposits, cryptoHoldings, creditCards, type User, type InsertUser, type Account, type Transaction, type AuditLog, type AccountApplication, type InsertApplication, type MobileDeposit, type CryptoHolding, type CreditCard } from "@shared/schema";
 import { db } from "./db";
-import { eq, or, desc, sql, and } from "drizzle-orm";
+import { eq, or, desc, and, inArray } from "drizzle-orm";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 
@@ -40,10 +40,12 @@ export interface IStorage {
 
   getTransactionsByAccountId(accountId: number): Promise<Transaction[]>;
   getAllTransactions(): Promise<Transaction[]>;
+  getPendingTransactionsByTypes(types: Array<"deposit" | "billpay">): Promise<Transaction[]>;
   
   deposit(accountId: number, amount: string, narration?: string): Promise<Transaction>;
   transfer(fromAccountId: number, toAccountNumber: string, amount: string, narration?: string): Promise<Transaction>;
   billpay(fromAccountId: number, billerType: string, amount: string, narration?: string): Promise<Transaction>;
+  reviewTransaction(id: number, status: "approved" | "rejected", reviewedBy: number, reason?: string): Promise<Transaction>;
   adjustBalance(accountId: number, amount: string, type: "adjustment_credit" | "adjustment_debit", staffUserId: number, reasonCode: string, narration?: string): Promise<Transaction>;
 
   createMobileDeposit(userId: number, accountId: number, amount: string, checkFrontUrl: string, checkBackUrl?: string): Promise<MobileDeposit>;
@@ -179,22 +181,24 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(transactions).orderBy(desc(transactions.createdAt));
   }
 
+  async getPendingTransactionsByTypes(types: Array<"deposit" | "billpay">): Promise<Transaction[]> {
+    return await db.select().from(transactions)
+      .where(and(inArray(transactions.type, types), eq(transactions.status, "pending")))
+      .orderBy(desc(transactions.createdAt));
+  }
+
   async deposit(accountId: number, amount: string, narration?: string): Promise<Transaction> {
-    return await db.transaction(async (tx) => {
-      const [account] = await tx.select().from(accounts).where(eq(accounts.id, accountId));
-      if (!account) throw new Error("Account not found");
-      const newBalance = (parseFloat(account.balance) + parseFloat(amount)).toFixed(2);
-      await tx.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, accountId));
-      const [transaction] = await tx.insert(transactions).values({
-        reference: `DEP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        type: "deposit",
-        amount,
-        toAccountId: accountId,
-        narration: narration || "Deposit",
-        status: "success"
-      }).returning();
-      return transaction;
-    });
+    const [account] = await db.select().from(accounts).where(eq(accounts.id, accountId));
+    if (!account) throw new Error("Account not found");
+    const [transaction] = await db.insert(transactions).values({
+      reference: `DEP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      type: "deposit",
+      amount,
+      toAccountId: accountId,
+      narration: narration || "Deposit",
+      status: "pending"
+    }).returning();
+    return transaction;
   }
 
   async transfer(fromAccountId: number, toAccountNumber: string, amount: string, narration?: string): Promise<Transaction> {
@@ -222,22 +226,65 @@ export class DatabaseStorage implements IStorage {
   }
 
   async billpay(fromAccountId: number, billerType: string, amount: string, narration?: string): Promise<Transaction> {
+    const [account] = await db.select().from(accounts).where(eq(accounts.id, fromAccountId));
+    if (!account) throw new Error("Account not found");
+    const amt = parseFloat(amount);
+    if (parseFloat(account.balance) < amt) throw new Error("Insufficient funds");
+
+    const [transaction] = await db.insert(transactions).values({
+      reference: `BP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      type: "billpay",
+      amount,
+      fromAccountId,
+      narration: narration || `Bill Pay: ${billerType}`,
+      status: "pending"
+    }).returning();
+    return transaction;
+  }
+
+  async reviewTransaction(id: number, status: "approved" | "rejected", reviewedBy: number, reason?: string): Promise<Transaction> {
     return await db.transaction(async (tx) => {
-      const [account] = await tx.select().from(accounts).where(eq(accounts.id, fromAccountId));
-      if (!account) throw new Error("Account not found");
-      const amt = parseFloat(amount);
-      if (parseFloat(account.balance) < amt) throw new Error("Insufficient funds");
-      const newBalance = (parseFloat(account.balance) - amt).toFixed(2);
-      await tx.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, fromAccountId));
-      const [transaction] = await tx.insert(transactions).values({
-        reference: `BP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        type: "billpay",
-        amount,
-        fromAccountId,
-        narration: narration || `Bill Pay: ${billerType}`,
-        status: "success"
-      }).returning();
-      return transaction;
+      const [existing] = await tx.select().from(transactions).where(eq(transactions.id, id));
+      if (!existing) throw new Error("Transaction not found");
+      if (existing.status !== "pending") throw new Error("Transaction has already been reviewed");
+      if (existing.type !== "deposit" && existing.type !== "billpay") throw new Error("Only deposit and bill pay transactions can be reviewed");
+
+      const finalStatus = status === "approved" ? "success" : "failed";
+      const reasonSuffix = reason ? ` (${reason})` : "";
+      let updatedNarration = existing.narration || undefined;
+
+      if (status === "approved") {
+        if (existing.type === "deposit") {
+          if (!existing.toAccountId) throw new Error("Deposit target account is missing");
+          const [account] = await tx.select().from(accounts).where(eq(accounts.id, existing.toAccountId));
+          if (!account) throw new Error("Account not found");
+          const newBalance = (parseFloat(account.balance) + parseFloat(existing.amount)).toFixed(2);
+          await tx.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, account.id));
+        }
+
+        if (existing.type === "billpay") {
+          if (!existing.fromAccountId) throw new Error("Bill pay source account is missing");
+          const [account] = await tx.select().from(accounts).where(eq(accounts.id, existing.fromAccountId));
+          if (!account) throw new Error("Account not found");
+          const amt = parseFloat(existing.amount);
+          if (parseFloat(account.balance) < amt) {
+            throw new Error("Insufficient funds at approval time");
+          }
+          const newBalance = (parseFloat(account.balance) - amt).toFixed(2);
+          await tx.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, account.id));
+        }
+
+        updatedNarration = `${existing.narration || existing.type} (approved by staff #${reviewedBy})`;
+      } else {
+        updatedNarration = `${existing.narration || existing.type} (rejected by staff #${reviewedBy}${reasonSuffix})`;
+      }
+
+      const [updatedTransaction] = await tx.update(transactions)
+        .set({ status: finalStatus, narration: updatedNarration, staffUserId: reviewedBy, reasonCode: status === "approved" ? "STAFF_APPROVED" : "STAFF_REJECTED" })
+        .where(eq(transactions.id, id))
+        .returning();
+
+      return updatedTransaction;
     });
   }
 
