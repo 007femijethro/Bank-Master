@@ -59,7 +59,7 @@ export interface IStorage {
   getAccount(id: number): Promise<Account | undefined>;
   getAccountByNumber(accountNumber: string): Promise<Account | undefined>;
   getAccountsByUserId(userId: number): Promise<Account[]>;
-  createAccount(userId: number, type: "share_savings" | "checking"): Promise<Account>;
+  createAccount(userId: number, type: "share_savings" | "checking", initialBalance?: string): Promise<Account>;
   
   createApplication(app: InsertApplication & { userId: number }): Promise<AccountApplication>;
   getApplications(): Promise<AccountApplication[]>;
@@ -154,7 +154,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(accounts).where(eq(accounts.userId, userId));
   }
 
-  async createAccount(userId: number, type: "share_savings" | "checking"): Promise<Account> {
+  async createAccount(userId: number, type: "share_savings" | "checking", initialBalance = "0.00"): Promise<Account> {
     let accountNumber = "";
     let isUnique = false;
     while (!isUnique) {
@@ -168,8 +168,8 @@ export class DatabaseStorage implements IStorage {
       accountNumber,
       type,
       currency: "USD",
-      balance: "0.00",
-      availableBalance: "0.00",
+      balance: initialBalance,
+      availableBalance: initialBalance,
       status: "active"
     }).returning();
     return account;
@@ -216,7 +216,13 @@ export class DatabaseStorage implements IStorage {
         .returning();
       
       if (status === "approved" && (app.type === "share_savings" || app.type === "checking")) {
-        await this.createAccount(app.userId, app.type as any);
+        await this.createAccount(app.userId, app.type);
+      }
+
+      if (status === "approved" && (app.type === "loan" || app.type === "home_equity")) {
+        const requestedAmount = Number(app.formData?.requestedAmount || 0);
+        const openingBalance = requestedAmount > 0 ? fixed2(requestedAmount) : "0.00";
+        await this.createAccount(app.userId, app.type as any, openingBalance);
       }
 
       if (status === "approved" && app.type === "credit_card") {
