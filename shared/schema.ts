@@ -22,6 +22,8 @@ export const users = pgTable("users", {
   memberNumber: text("member_number").unique(),
   dashboardWidgets: jsonb("dashboard_widgets").$type<string[]>().default(["balance", "routing", "activity", "cards"]).notNull(),
   avatarUrl: text("avatar_url"),
+  kycStatus: text("kyc_status", { enum: ["pending", "verified", "rejected"] }).default("pending").notNull(),
+  kycVerifiedAt: timestamp("kyc_verified_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -31,6 +33,9 @@ export const accountApplications = pgTable("account_applications", {
   type: text("type", { enum: ["share_savings", "checking", "loan", "home_equity", "credit_card"] }).notNull(),
   status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
   rejectionReason: text("rejection_reason"),
+  riskScore: integer("risk_score").default(0).notNull(),
+  underwritingDecisionReason: text("underwriting_decision_reason"),
+  adverseActionNote: text("adverse_action_note"),
   formData: jsonb("form_data").$type<Record<string, any>>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -42,6 +47,7 @@ export const accounts = pgTable("accounts", {
   type: text("type", { enum: ["share_savings", "checking"] }).notNull(),
   currency: text("currency").default("USD").notNull(),
   balance: decimal("balance", { precision: 15, scale: 2 }).default("0.00").notNull(),
+  availableBalance: decimal("available_balance", { precision: 15, scale: 2 }).default("0.00").notNull(),
   status: text("status", { enum: ["active", "closed"] }).default("active").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -54,10 +60,48 @@ export const transactions = pgTable("transactions", {
   fromAccountId: integer("from_account_id"),
   toAccountId: integer("to_account_id"),
   creditCardId: integer("credit_card_id"),
+  rail: text("rail", { enum: ["internal", "ach", "wire", "card"] }).default("internal").notNull(),
+  effectiveDate: timestamp("effective_date"),
+  postedAt: timestamp("posted_at"),
+  parentTransactionId: integer("parent_transaction_id"),
+  merchantName: text("merchant_name"),
+  counterparty: text("counterparty"),
   narration: text("narration"),
   reasonCode: text("reason_code"),
   staffUserId: integer("staff_user_id"),
-  status: text("status", { enum: ["pending", "success", "failed"] }).default("pending").notNull(),
+  status: text("status", { enum: ["pending", "posted", "reversed", "returned", "success", "failed"] }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const holds = pgTable("holds", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  reason: text("reason").notNull(),
+  status: text("status", { enum: ["active", "released"] }).default("active").notNull(),
+  releaseAt: timestamp("release_at"),
+  releasedBy: integer("released_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const statements = pgTable("statements", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").notNull(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).notNull(),
+  closingBalance: decimal("closing_balance", { precision: 15, scale: 2 }).notNull(),
+  artifactUrl: text("artifact_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  eventType: text("event_type").notNull(),
+  message: text("message").notNull(),
+  metadata: jsonb("metadata"),
+  read: boolean("read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -113,9 +157,13 @@ export const userSessions = pgTable("user_sessions", {
 
 export const auditLogs = pgTable("audit_logs", {
   id: serial("id").primaryKey(),
+  eventId: text("event_id").notNull().unique(),
+  correlationId: text("correlation_id"),
   actorUserId: integer("actor_user_id"),
+  actorType: text("actor_type", { enum: ["member", "staff", "system"] }).default("system").notNull(),
   action: text("action").notNull(), 
   ipAddress: text("ip_address"),
+  requestMetadata: jsonb("request_metadata"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -129,6 +177,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   mobileDeposits: many(mobileDeposits),
   cryptoHoldings: many(cryptoHoldings),
   creditCards: many(creditCards),
+  notifications: many(notifications),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -138,6 +187,8 @@ export const accountsRelations = relations(accounts, ({ one, many }) => ({
   }),
   outgoingTransactions: many(transactions, { relationName: "fromAccount" }),
   incomingTransactions: many(transactions, { relationName: "toAccount" }),
+  holds: many(holds),
+  statements: many(statements),
 }));
 
 export const accountApplicationsRelations = relations(accountApplications, ({ one }) => ({
@@ -161,6 +212,31 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
   creditCard: one(creditCards, {
     fields: [transactions.creditCardId],
     references: [creditCards.id],
+  }),
+  parentTransaction: one(transactions, {
+    fields: [transactions.parentTransactionId],
+    references: [transactions.id],
+  }),
+}));
+
+export const holdsRelations = relations(holds, ({ one }) => ({
+  account: one(accounts, {
+    fields: [holds.accountId],
+    references: [accounts.id],
+  }),
+}));
+
+export const statementsRelations = relations(statements, ({ one }) => ({
+  account: one(accounts, {
+    fields: [statements.accountId],
+    references: [accounts.id],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
   }),
 }));
 
@@ -200,7 +276,7 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true, creat
   dashboardWidgets: z.array(z.string()).optional(),
 });
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true, createdAt: true, accountNumber: true, balance: true, status: true });
-export const insertApplicationSchema = createInsertSchema(accountApplications).omit({ id: true, createdAt: true, status: true, rejectionReason: true });
+export const insertApplicationSchema = createInsertSchema(accountApplications).omit({ id: true, createdAt: true, status: true, rejectionReason: true, riskScore: true, underwritingDecisionReason: true, adverseActionNote: true });
 export const insertCreditCardSchema = createInsertSchema(creditCards).omit({ id: true, createdAt: true });
 
 // === EXPLICIT API CONTRACT TYPES ===
@@ -213,6 +289,9 @@ export type AccountApplication = typeof accountApplications.$inferSelect;
 export type MobileDeposit = typeof mobileDeposits.$inferSelect;
 export type CryptoHolding = typeof cryptoHoldings.$inferSelect;
 export type CreditCard = typeof creditCards.$inferSelect;
+export type Hold = typeof holds.$inferSelect;
+export type Statement = typeof statements.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertApplication = z.infer<typeof insertApplicationSchema>;
