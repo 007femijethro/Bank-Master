@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, CreditCard, Settings2, Check, History, Coins, Home, Eye, EyeOff } from "lucide-react";
+import { Plus, Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, CreditCard, Settings2, History, Coins, Home, Eye, EyeOff, Send, ArrowDown, Grid2x2, Users, ChevronRight, Landmark, HandCoins, Receipt, LineChart, TrendingUp, TrendingDown } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -39,6 +39,8 @@ export default function CustomerDashboard() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [accountType, setAccountType] = useState<"share_savings" | "checking" | "loan" | "home_equity" | "credit_card">("share_savings");
   const [showCardDetails, setShowCardDetails] = useState(false);
+  const [activeSnapshot, setActiveSnapshot] = useState<"fiat" | "crypto">("fiat");
+  const [hideSnapshotBalance, setHideSnapshotBalance] = useState(false);
   
   const queryClient = useQueryClient();
 
@@ -64,8 +66,11 @@ export default function CustomerDashboard() {
     const coin = CRYPTO_DATA.find(c => c.symbol === h.symbol);
     return sum + (coin ? parseFloat(h.amount) * coin.basePrice : 0);
   }, 0);
+  const btcHolding = (cryptoHoldings || []).find((h: any) => h.symbol === "BTC");
+  const btcPrice = CRYPTO_DATA.find((c) => c.symbol === "BTC")?.basePrice || 0;
 
   const homeEquityAccounts = accounts?.filter(a => (a.type as string) === "home_equity") || [];
+  const fiatAccount = accounts?.find((a) => (a.type as string) !== "loan");
   const primaryCreditCard = creditCardsList?.[0];
   const updateWidgets = useMutation({
     mutationFn: async (newWidgets: string[]) => {
@@ -85,6 +90,14 @@ export default function CustomerDashboard() {
 
   const totalBalance = accounts?.reduce((sum, acc) => sum + Number(acc.balance), 0) || 0;
   const recentTransactions = transactions?.slice(0, 5) || [];
+  const monthlyIncome = (transactions || [])
+    .filter((tx) => tx.type === "deposit" || tx.type === "adjustment_credit")
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const monthlyExpenses = (transactions || [])
+    .filter((tx) => tx.type === "transfer" || tx.type === "billpay" || tx.type === "adjustment_debit" || tx.type === "credit_card_purchase" || tx.type === "fee_assessment")
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const utilizationLimit = 500000;
+  const utilizationRatio = Math.min((totalBalance / utilizationLimit) * 100, 100);
   const userAccountIds = new Set((accounts || []).map((acc) => acc.id));
 
   const isCreditTransaction = (tx: any) => {
@@ -251,6 +264,86 @@ export default function CustomerDashboard() {
         )}
       </div>
 
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Account Snapshot</CardTitle>
+            <Button variant="ghost" size="icon" onClick={() => setHideSnapshotBalance((v) => !v)}>
+              {hideSnapshotBalance ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+            </Button>
+          </div>
+          <CardDescription>Switch between fiat and crypto balances.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Button
+              variant={activeSnapshot === "fiat" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveSnapshot("fiat")}
+            >
+              Fiat Account
+            </Button>
+            <Button
+              variant={activeSnapshot === "crypto" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveSnapshot("crypto")}
+            >
+              Crypto Wallet
+            </Button>
+          </div>
+
+          {activeSnapshot === "fiat" ? (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Available Balance</p>
+              <p className="text-3xl font-bold">
+                {hideSnapshotBalance
+                  ? "••••••"
+                  : `$${Number(fiatAccount?.availableBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+              </p>
+              <p className="text-sm text-muted-foreground">Account: {fiatAccount?.accountNumber || "N/A"}</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Bitcoin Balance</p>
+              <p className="text-3xl font-bold">
+                {hideSnapshotBalance ? "••••••" : `${Number(btcHolding?.amount || 0).toFixed(6)} BTC`}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {hideSnapshotBalance ? "≈ ••••••" : `≈ $${cryptoTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} · 1 BTC = ${btcPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Link href="/transactions"><Button variant="outline" className="w-full justify-start"><Plus className="w-4 h-4 mr-2" />Top Up</Button></Link>
+          <Link href="/transactions"><Button variant="outline" className="w-full justify-start"><Send className="w-4 h-4 mr-2" />Send</Button></Link>
+          <Link href="/transactions"><Button variant="outline" className="w-full justify-start"><ArrowDown className="w-4 h-4 mr-2" />Receive</Button></Link>
+          <Link href="/apply"><Button variant="outline" className="w-full justify-start"><Grid2x2 className="w-4 h-4 mr-2" />More</Button></Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg">Quick Transfer</CardTitle>
+          <Link href="/transactions" className="text-sm text-primary font-medium inline-flex items-center">View All <ChevronRight className="w-4 h-4 ml-1" /></Link>
+        </CardHeader>
+        <CardContent className="flex items-center gap-4">
+          <Button variant="outline" className="rounded-full w-16 h-16 p-0 border-dashed">
+            <Plus className="w-6 h-6" />
+          </Button>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Users className="w-4 h-4" />
+            No saved beneficiaries
+          </div>
+        </CardContent>
+      </Card>
+
       {currentWidgets.includes("cards") && primaryCreditCard && (
         <Card data-testid="dashboard-credit-card">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
@@ -327,6 +420,88 @@ export default function CustomerDashboard() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg">Financial Services</CardTitle>
+          <Link href="/apply" className="text-sm text-primary font-medium inline-flex items-center">View All <ChevronRight className="w-4 h-4 ml-1" /></Link>
+        </CardHeader>
+        <CardContent className="grid sm:grid-cols-2 gap-4">
+          <Card className="border-muted">
+            <CardContent className="pt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold flex items-center gap-2"><Landmark className="w-4 h-4" />Loans</p>
+                <Badge variant="secondary">Available</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">Quick approval process</p>
+              <Link href="/apply"><Button className="w-full">Apply Now</Button></Link>
+            </CardContent>
+          </Card>
+          <Card className="border-muted">
+            <CardContent className="pt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold flex items-center gap-2"><HandCoins className="w-4 h-4" />Grants</p>
+                <Badge variant="destructive">Rejected</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">Amount: $5,000.00</p>
+              <Link href="/apply"><Button variant="outline" className="w-full">View Status</Button></Link>
+            </CardContent>
+          </Card>
+          <Card className="border-muted">
+            <CardContent className="pt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold flex items-center gap-2"><Receipt className="w-4 h-4" />Tax Refunds</p>
+                <Badge variant="secondary">Available</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">Fast processing</p>
+              <Link href="/apply"><Button className="w-full">Apply Now</Button></Link>
+            </CardContent>
+          </Card>
+          <Card className="border-muted">
+            <CardContent className="pt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold flex items-center gap-2"><CreditCard className="w-4 h-4" />Virtual Cards</p>
+                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Active</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">Card ending in •••• {primaryCreditCard?.lastFour || "3061"}</p>
+              <Link href="/credit-cards"><Button className="w-full">Manage Cards</Button></Link>
+            </CardContent>
+          </Card>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg">Financial Insights</CardTitle>
+          <Link href="/transactions" className="text-sm text-primary font-medium inline-flex items-center">View Report <ChevronRight className="w-4 h-4 ml-1" /></Link>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold inline-flex items-center gap-2"><LineChart className="w-4 h-4" />Account Health</p>
+              <p className="text-sm text-muted-foreground">Balance Ratio {utilizationRatio.toFixed(1)}%</p>
+            </div>
+            <div className="w-full bg-muted rounded-full h-2">
+              <div className="bg-primary rounded-full h-2" style={{ width: `${utilizationRatio}%` }} />
+            </div>
+            <p className="text-sm text-muted-foreground">${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} of ${utilizationLimit.toLocaleString(undefined, { minimumFractionDigits: 2 })} limit</p>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Card className="border-muted">
+              <CardContent className="pt-5">
+                <p className="text-sm text-muted-foreground inline-flex items-center gap-2"><TrendingUp className="w-4 h-4 text-emerald-600" />Income</p>
+                <p className="text-2xl font-bold text-emerald-600">${monthlyIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-muted">
+              <CardContent className="pt-5">
+                <p className="text-sm text-muted-foreground inline-flex items-center gap-2"><TrendingDown className="w-4 h-4 text-red-600" />Expenses</p>
+                <p className="text-2xl font-bold text-red-600">${monthlyExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </CardContent>
+            </Card>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-8 md:grid-cols-2">
         <div className="space-y-4">
