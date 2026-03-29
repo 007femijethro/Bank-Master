@@ -17,6 +17,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Link } from "wouter";
+import { Input } from "@/components/ui/input";
 
 const CRYPTO_DATA = [
   { symbol: "BTC", name: "Bitcoin", basePrice: 97284.50 },
@@ -37,6 +38,9 @@ export default function CustomerDashboard() {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [idMeEmail, setIdMeEmail] = useState("");
+  const [idMeReference, setIdMeReference] = useState("");
   const [accountType, setAccountType] = useState<"share_savings" | "checking" | "loan" | "home_equity" | "credit_card">("share_savings");
   const [showCardDetails, setShowCardDetails] = useState(false);
   
@@ -85,6 +89,11 @@ export default function CustomerDashboard() {
 
   const totalBalance = accounts?.reduce((sum, acc) => sum + Number(acc.balance), 0) || 0;
   const recentTransactions = transactions?.slice(0, 5) || [];
+  useEffect(() => {
+    if (!isLoading) {
+      setLastUpdatedAt(new Date());
+    }
+  }, [isLoading, accounts, transactions]);
   const userAccountIds = new Set((accounts || []).map((acc) => acc.id));
 
   const isCreditTransaction = (tx: any) => {
@@ -98,6 +107,20 @@ export default function CustomerDashboard() {
   };
 
   const currentWidgets = user?.dashboardWidgets || ["balance", "activity", "cards", "crypto", "home_equity"];
+  const monthlyIncome = (transactions || []).reduce((sum, tx: any) => {
+    const txDate = new Date(tx.createdAt || new Date());
+    const now = new Date();
+    const inCurrentMonth = txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+    if (!inCurrentMonth) return sum;
+    return isCreditTransaction(tx) ? sum + Number(tx.amount) : sum;
+  }, 0);
+  const monthlyExpenses = (transactions || []).reduce((sum, tx: any) => {
+    const txDate = new Date(tx.createdAt || new Date());
+    const now = new Date();
+    const inCurrentMonth = txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+    if (!inCurrentMonth) return sum;
+    return isCreditTransaction(tx) ? sum : sum + Number(tx.amount);
+  }, 0);
 
   const toggleWidget = (widget: string) => {
     const newWidgets = currentWidgets.includes(widget)
@@ -144,6 +167,9 @@ export default function CustomerDashboard() {
           <div>
             <h2 className="text-3xl font-display font-bold text-foreground">Redbird FCU Dashboard</h2>
             <p className="text-muted-foreground">Member: {user?.fullName} | Member #: {user?.memberNumber}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Last updated: {lastUpdatedAt ? format(lastUpdatedAt, "MMM d, h:mm a") : "Syncing..."}
+            </p>
           </div>
         </div>
         
@@ -235,7 +261,27 @@ export default function CustomerDashboard() {
       </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="md:hidden flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory">
+        {currentWidgets.includes("balance") && (
+          <div className="snap-start min-w-[280px]">
+            <StatCard title="Total Balance" value={`$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Wallet} className="bg-primary text-primary-foreground border-none" />
+          </div>
+        )}
+        {currentWidgets.includes("crypto") && cryptoTotalValue > 0 && (
+          <Link href="/crypto" className="snap-start min-w-[280px]">
+            <StatCard title="Crypto Portfolio" value={`$${cryptoTotalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Coins} description={`${(cryptoHoldings || []).length} asset${(cryptoHoldings || []).length !== 1 ? 's' : ''} held`} />
+          </Link>
+        )}
+        {currentWidgets.includes("home_equity") && homeEquityAccounts.length > 0 && (
+          homeEquityAccounts.map((acc: any) => (
+            <div key={acc.id} className="snap-start min-w-[280px]">
+              <StatCard title="Home Equity" value={`$${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Home} description={`Acct: ****${acc.accountNumber.slice(-4)}`} />
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="hidden md:grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {currentWidgets.includes("balance") && (
           <StatCard title="Total Balance" value={`$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Wallet} className="bg-primary text-primary-foreground border-none" />
         )}
@@ -249,6 +295,54 @@ export default function CustomerDashboard() {
             <StatCard key={acc.id} title="Home Equity" value={`$${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Home} description={`Acct: ****${acc.accountNumber.slice(-4)}`} />
           ))
         )}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Tax Refunds</CardTitle>
+            <CardDescription>Share your ID.me details so our team can help with your tax refund application.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              <Label>ID.me Email</Label>
+              <Input value={idMeEmail} onChange={(e) => setIdMeEmail(e.target.value)} placeholder="you@example.com" />
+            </div>
+            <div className="space-y-2">
+              <Label>ID.me Reference / Username</Label>
+              <Input value={idMeReference} onChange={(e) => setIdMeReference(e.target.value)} placeholder="Reference ID or username" />
+            </div>
+            <Button
+              onClick={() => toast({ title: "Tax Refund Request Sent", description: "A specialist will review your ID.me details and follow up shortly." })}
+              disabled={!idMeEmail || !idMeReference}
+            >
+              Submit Tax Refund Details
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Expenses Summary (This Month)</CardTitle>
+            <CardDescription>Track how much you earned and spent this month.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between items-center border rounded-lg p-3">
+              <span className="text-muted-foreground">Income</span>
+              <span className="font-bold text-green-600">${monthlyIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between items-center border rounded-lg p-3">
+              <span className="text-muted-foreground">Expenses</span>
+              <span className="font-bold text-destructive">${monthlyExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between items-center border rounded-lg p-3 bg-muted/40">
+              <span className="text-muted-foreground">Net</span>
+              <span className={`font-bold ${monthlyIncome - monthlyExpenses >= 0 ? "text-green-600" : "text-destructive"}`}>
+                ${(monthlyIncome - monthlyExpenses).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {currentWidgets.includes("cards") && primaryCreditCard && (

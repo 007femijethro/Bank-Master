@@ -65,7 +65,6 @@ function Router() {
       <Route path="/mobile-deposit">
         <ProtectedRoute component={MobileDepositPage} />
       </Route>
-
       <Route path="/admin">
         <ProtectedRoute component={AdminDashboard} adminOnly />
       </Route>
