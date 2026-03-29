@@ -109,6 +109,8 @@ export default function CustomerDashboard() {
     const coin = CRYPTO_DATA.find((c) => c.symbol === h.symbol);
     return sum + (coin ? parseFloat(h.amount) * coin.basePrice : 0);
   }, 0);
+  const btcHolding = (cryptoHoldings || []).find((h: any) => h.symbol === "BTC");
+  const btcPrice = CRYPTO_DATA.find((c) => c.symbol === "BTC")?.basePrice || 0;
 
   const btcHolding = (cryptoHoldings || []).find((h: any) => h.symbol === "BTC");
   const btcPrice = CRYPTO_DATA.find((c) => c.symbol === "BTC")?.basePrice || 0;
