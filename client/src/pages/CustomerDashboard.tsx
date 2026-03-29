@@ -111,9 +111,6 @@ export default function CustomerDashboard() {
   }, 0);
   const btcHolding = (cryptoHoldings || []).find((h: any) => h.symbol === "BTC");
   const btcPrice = CRYPTO_DATA.find((c) => c.symbol === "BTC")?.basePrice || 0;
-
-  const btcHolding = (cryptoHoldings || []).find((h: any) => h.symbol === "BTC");
-  const btcPrice = CRYPTO_DATA.find((c) => c.symbol === "BTC")?.basePrice || 0;
   const btcAmount = btcHolding ? Number(btcHolding.amount) : 0;
 
   const accountCards = useMemo(
