@@ -124,7 +124,7 @@ export async function registerRoutes(
     try {
       const input = api.transactions.deposit.input.parse(req.body);
       const user = req.user as any;
-      if (user.status === 'frozen') return res.status(403).json({ message: "User is frozen" });
+      if (user.status === 'frozen') return res.status(403).json({ message: "Account is frozen" });
       const account = await storage.getAccount(input.accountId);
       if (!account || account.userId !== user.id) return res.status(403).json({ message: "Account not found or not owned by you" });
       const tx = await storage.deposit(input.accountId, input.amount, input.narration);
@@ -138,7 +138,7 @@ export async function registerRoutes(
     try {
       const input = api.transactions.transfer.input.parse(req.body);
       const user = req.user as any;
-      if (user.status === 'frozen') return res.status(403).json({ message: "User is frozen" });
+      if (user.status === 'frozen') return res.status(403).json({ message: "Account is frozen" });
       const tx = await storage.transfer(input.fromAccountId, input.toAccountNumber, input.amount, input.narration, input.rail);
       await storage.createAuditLog(user.id, "TRANSFER", req.ip, { amount: input.amount });
       await storage.createNotification(user.id, "transfer_posted", `Transfer of $${input.amount} has posted.`, { transactionId: tx.id });
@@ -270,7 +270,7 @@ export async function registerRoutes(
     try {
       const input = api.transactions.billpay.input.parse(req.body);
       const user = req.user as any;
-      if (user.status === 'frozen') return res.status(403).json({ message: "User is frozen" });
+      if (user.status === 'frozen') return res.status(403).json({ message: "Account is frozen" });
       const account = await storage.getAccount(input.fromAccountId);
       if (!account || account.userId !== user.id) return res.status(403).json({ message: "Account not found or not owned by you" });
       const tx = await storage.billpay(input.fromAccountId, input.billerType, input.amount, input.narration);
@@ -532,7 +532,7 @@ export async function registerRoutes(
   app.post("/api/credit-cards/:id/purchase", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
-      if (user.status === 'frozen') return res.status(403).json({ message: "Account frozen" });
+      if (user.status === 'frozen') return res.status(403).json({ message: "Account is frozen" });
       const card = await storage.getCreditCard(Number(req.params.id));
       if (!card || card.userId !== user.id) return res.status(404).json({ message: "Card not found" });
       const { amount, merchant } = req.body;
@@ -546,7 +546,7 @@ export async function registerRoutes(
   app.post("/api/credit-cards/:id/payment", requireAuth, async (req, res) => {
     try {
       const user = req.user as any;
-      if (user.status === 'frozen') return res.status(403).json({ message: "Account frozen" });
+      if (user.status === 'frozen') return res.status(403).json({ message: "Account is frozen" });
       const card = await storage.getCreditCard(Number(req.params.id));
       if (!card || card.userId !== user.id) return res.status(404).json({ message: "Card not found" });
       const { amount, fromAccountId } = req.body;
