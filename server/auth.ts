@@ -30,12 +30,14 @@ async function ensureSessionTable() {
 export async function setupAuth(app: Express) {
   await ensureSessionTable();
   const PgStore = connectPgSimple(session);
+  const INACTIVITY_TIMEOUT_MS = 3 * 60 * 1000;
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "r3pl1t_s3cr3t_k3y",
     resave: false,
     saveUninitialized: false,
+    rolling: true,
     cookie: {
-      maxAge: 30 * 60 * 1000,
+      maxAge: INACTIVITY_TIMEOUT_MS,
     },
     store: new PgStore({
       pool: pool,
@@ -48,7 +50,7 @@ export async function setupAuth(app: Express) {
     app.set("trust proxy", 1);
     sessionSettings.cookie = {
       secure: true,
-      maxAge: 30 * 60 * 1000,
+      maxAge: INACTIVITY_TIMEOUT_MS,
     };
   }
 
