@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +35,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || "");
   const [fullName, setFullName] = useState(user?.fullName || "");
   const [phone, setPhone] = useState(user?.phone || "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -61,6 +65,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
     },
     onError: (e: any) => {
       toast({ variant: "destructive", title: "Update Failed", description: e.message });
+    }
+  });
+
+  const updatePassword = useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      const res = await fetch("/api/user/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.message || "Failed to update password");
+      return payload;
+    },
+    onSuccess: () => {
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast({ title: "Password Updated", description: "Your password has been changed successfully." });
+    },
+    onError: (e: any) => {
+      toast({ variant: "destructive", title: "Password Update Failed", description: e.message });
     }
   });
 
@@ -242,8 +268,64 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   placeholder="https://example.com/image.png"
                 />
               </div>
+
+              <Separator className="my-2" />
+
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Change Password</p>
+                <p className="text-xs text-muted-foreground">Use at least 8 characters and keep it unique.</p>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="current-password">Current Password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter current password"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="confirm-password">Confirm New Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                />
+              </div>
             </div>
             <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (!currentPassword || !newPassword || !confirmPassword) {
+                    toast({ variant: "destructive", title: "Missing fields", description: "Please fill out all password fields." });
+                    return;
+                  }
+                  if (newPassword !== confirmPassword) {
+                    toast({ variant: "destructive", title: "Passwords do not match", description: "New password and confirmation must match." });
+                    return;
+                  }
+                  updatePassword.mutate({ currentPassword, newPassword });
+                }}
+                disabled={updatePassword.isPending}
+              >
+                {updatePassword.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
+                Update Password
+              </Button>
               <Button 
                 type="submit" 
                 onClick={() => updateProfile.mutate({ avatarUrl, fullName, phone })}

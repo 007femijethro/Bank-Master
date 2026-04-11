@@ -466,6 +466,47 @@ export async function registerRoutes(
     res.json(updatedUser[0]);
   });
 
+  app.patch("/api/user/password", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const input = z.object({
+        currentPassword: z.string().min(1, "Current password is required"),
+        newPassword: z.string().min(8, "New password must be at least 8 characters"),
+      }).parse(req.body);
+
+      const existingUser = await storage.getUser(user.id);
+      if (!existingUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isCurrentPasswordValid = await storage.comparePasswords(input.currentPassword, existingUser.password);
+      if (!isCurrentPasswordValid) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      const isSamePassword = await storage.comparePasswords(input.newPassword, existingUser.password);
+      if (isSamePassword) {
+        return res.status(400).json({ message: "New password must be different from current password" });
+      }
+
+      const hashedPassword = await storage.hashPassword(input.newPassword);
+      await db.update(users)
+        .set({ password: hashedPassword })
+        .where(eq(users.id, user.id as number));
+
+      await storage.createAuditLog(user.id, "PASSWORD_CHANGE", req.ip, {
+        email: existingUser.email,
+      });
+
+      res.status(200).json({ message: "Password updated successfully" });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(500).json({ message: "Failed to update password" });
+    }
+  });
+
   // Member applications list
   app.get("/api/my-applications", requireAuth, async (req, res) => {
     const user = req.user as any;
