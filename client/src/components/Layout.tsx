@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || "");
   const [fullName, setFullName] = useState(user?.fullName || "");
   const [phone, setPhone] = useState(user?.phone || "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -63,6 +65,51 @@ export function Layout({ children }: { children: React.ReactNode }) {
       toast({ variant: "destructive", title: "Update Failed", description: e.message });
     }
   });
+
+  const changePassword = useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      const res = await fetch(api.auth.changePassword.path, {
+        method: api.auth.changePassword.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || "Failed to update password");
+      return result;
+    },
+    onSuccess: (data) => {
+      toast({ title: "Password Updated", description: data.message || "Your password has been changed." });
+      setCurrentPassword("");
+      setNewPassword("");
+    },
+    onError: (e: any) => {
+      toast({ variant: "destructive", title: "Password Update Failed", description: e.message });
+    },
+  });
+
+  useEffect(() => {
+    if (!user) return;
+
+    const inactivityMs = 3 * 60 * 1000;
+    let timeoutId: number;
+
+    const resetTimer = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        toast({ title: "Session Expired", description: "You were logged out after 3 minutes of inactivity." });
+        logout.mutate();
+      }, inactivityMs);
+    };
+
+    const events: Array<keyof WindowEventMap> = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    events.forEach((eventName) => window.addEventListener(eventName, resetTimer));
+    resetTimer();
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      events.forEach((eventName) => window.removeEventListener(eventName, resetTimer));
+    };
+  }, [user, logout, toast]);
 
   if (!user) return <>{children}</>;
 
@@ -241,6 +288,39 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   onChange={(e) => setAvatarUrl(e.target.value)} 
                   placeholder="https://example.com/image.png"
                 />
+              </div>
+              <div className="border-t pt-4 mt-2 space-y-2">
+                <p className="text-sm font-medium">Change Password</p>
+                <div className="grid gap-2">
+                  <Label htmlFor="current-password">Current Password</Label>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  disabled={changePassword.isPending || !currentPassword || newPassword.length < 6}
+                  onClick={() => changePassword.mutate({ currentPassword, newPassword })}
+                >
+                  {changePassword.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
+                  Update Password
+                </Button>
               </div>
             </div>
             <DialogFooter>

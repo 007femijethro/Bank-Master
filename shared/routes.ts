@@ -52,6 +52,19 @@ export const api = {
         401: z.void(),
       },
     },
+    changePassword: {
+      method: 'POST' as const,
+      path: '/api/user/password' as const,
+      input: z.object({
+        currentPassword: z.string().min(1, "Current password is required"),
+        newPassword: z.string().min(6, "New password must be at least 6 characters"),
+      }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: z.object({ message: z.string() }),
+        401: z.void(),
+      },
+    },
   },
   accounts: {
     list: {
