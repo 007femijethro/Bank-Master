@@ -34,8 +34,9 @@ export async function setupAuth(app: Express) {
     secret: process.env.SESSION_SECRET || "r3pl1t_s3cr3t_k3y",
     resave: false,
     saveUninitialized: false,
+    rolling: true,
     cookie: {
-      maxAge: 30 * 60 * 1000,
+      maxAge: 3 * 60 * 1000,
     },
     store: new PgStore({
       pool: pool,
@@ -48,7 +49,7 @@ export async function setupAuth(app: Express) {
     app.set("trust proxy", 1);
     sessionSettings.cookie = {
       secure: true,
-      maxAge: 30 * 60 * 1000,
+      maxAge: 3 * 60 * 1000,
     };
   }
 
@@ -64,9 +65,6 @@ export async function setupAuth(app: Express) {
           return done(null, false, { message: "Incorrect username." });
         }
         
-        if (user.status === "frozen") {
-          return done(null, false, { message: "Account is frozen." });
-        }
 
         if (user.status === "locked") {
           return done(null, false, { message: "Your account is locked. Please contact support." });
