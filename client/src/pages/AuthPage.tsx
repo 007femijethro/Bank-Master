@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, ShieldCheck, Lock, CheckCircle, Clock } from "lucide-react";
+import { Loader2, ShieldCheck, Lock, CheckCircle, Clock, Eye, EyeOff, Landmark, Smartphone, ArrowRightLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -75,7 +75,10 @@ const registerSchema = z.object({
   city: z.string().min(1, "City is required"),
   state: z.string().min(1, "State is required"),
   zipCode: z.string().length(5, "ZIP code must be 5 digits"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(10, "Password must be at least 10 characters")
+    .regex(/[A-Z]/, "Include an uppercase letter")
+    .regex(/[a-z]/, "Include a lowercase letter")
+    .regex(/[0-9]/, "Include a number"),
 });
 
 export default function AuthPage() {
@@ -83,6 +86,8 @@ export default function AuthPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("login");
   const [registrationPending, setRegistrationPending] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -144,8 +149,29 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50/50 dark:bg-background p-4">
-      <div className="w-full max-w-lg grid gap-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 lg:p-8 flex items-center">
+      <div className="w-full max-w-6xl mx-auto grid lg:grid-cols-[1.05fr_0.95fr] bg-white dark:bg-background rounded-3xl overflow-hidden shadow-2xl">
+        <section className="hidden lg:flex flex-col justify-between p-12 text-white bg-gradient-to-br from-blue-700 via-blue-800 to-slate-950 relative overflow-hidden">
+          <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10" />
+          <div className="relative">
+            <div className="inline-flex items-center gap-3 font-display font-bold text-2xl">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-white/15"><ShieldCheck className="h-7 w-7" /></span>
+              Redbird FCU
+            </div>
+            <h2 className="mt-20 max-w-md text-5xl font-display font-bold leading-tight">Your money, clearly in view.</h2>
+            <p className="mt-5 max-w-md text-lg text-blue-100">Manage accounts, move money, pay bills and review your financial activity from one secure workspace.</p>
+          </div>
+          <div className="relative grid grid-cols-3 gap-3">
+            {[{ icon: Landmark, label: "Accounts" }, { icon: ArrowRightLeft, label: "Transfers" }, { icon: Smartphone, label: "Mobile access" }].map(({ icon: Icon, label }) => (
+              <div key={label} className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+                <Icon className="h-5 w-5 mb-3" />
+                <p className="text-sm font-medium">{label}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="p-6 sm:p-10 lg:p-12 grid gap-8 content-center max-h-screen overflow-y-auto">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2 text-primary mb-4">
             <ShieldCheck className="w-12 h-12" />
@@ -189,7 +215,12 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Password</FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="Enter password" {...field} data-testid="input-login-password" />
+                            <div className="relative">
+                              <Input type={showLoginPassword ? "text" : "password"} placeholder="Enter password" className="pr-11" {...field} data-testid="input-login-password" />
+                              <button type="button" onClick={() => setShowLoginPassword((value) => !value)} className="absolute inset-y-0 right-0 px-3 text-muted-foreground hover:text-foreground" aria-label={showLoginPassword ? "Hide password" : "Show password"}>
+                                {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -416,7 +447,12 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>Password</FormLabel>
                               <FormControl>
-                                <Input type="password" placeholder="Min. 6 characters" {...field} data-testid="input-register-password" />
+                                <div className="relative">
+                                  <Input type={showRegisterPassword ? "text" : "password"} placeholder="Minimum 10 characters" className="pr-11" {...field} data-testid="input-register-password" />
+                                  <button type="button" onClick={() => setShowRegisterPassword((value) => !value)} className="absolute inset-y-0 right-0 px-3 text-muted-foreground hover:text-foreground" aria-label={showRegisterPassword ? "Hide password" : "Show password"}>
+                                    {showRegisterPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                  </button>
+                                </div>
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -437,6 +473,8 @@ export default function AuthPage() {
             </Card>
           </TabsContent>
         </Tabs>
+        <p className="text-center text-xs text-muted-foreground">Protected by encrypted sessions and automatic inactivity sign-out.</p>
+        </div>
       </div>
     </div>
   );

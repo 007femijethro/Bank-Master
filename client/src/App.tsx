@@ -4,17 +4,19 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
-import AuthPage from "@/pages/AuthPage";
-import CustomerDashboard from "@/pages/CustomerDashboard";
-import TransactionPage from "@/pages/TransactionPage";
-import AdminDashboard from "@/pages/AdminDashboard";
-import ApplyPage from "@/pages/ApplyPage";
-import CryptoPage from "@/pages/CryptoPage";
-import MobileDepositPage from "@/pages/MobileDepositPage";
-import CreditCardsPage from "@/pages/CreditCardsPage";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
+import { lazy, Suspense } from "react";
+
+const AuthPage = lazy(() => import("@/pages/AuthPage"));
+const CustomerDashboard = lazy(() => import("@/pages/CustomerDashboard"));
+const TransactionPage = lazy(() => import("@/pages/TransactionPage"));
+const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
+const ApplyPage = lazy(() => import("@/pages/ApplyPage"));
+const CryptoPage = lazy(() => import("@/pages/CryptoPage"));
+const MobileDepositPage = lazy(() => import("@/pages/MobileDepositPage"));
+const CreditCardsPage = lazy(() => import("@/pages/CreditCardsPage"));
 
 function ProtectedRoute({ component: Component, adminOnly = false }: { component: React.ComponentType, adminOnly?: boolean }) {
   const { user, isLoading } = useAuth();
@@ -82,7 +84,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Router />
+        <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+          <Router />
+        </Suspense>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
