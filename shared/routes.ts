@@ -37,6 +37,11 @@ export const api = {
         401: z.object({ message: z.string() }),
       },
     },
+    sessionStatus: {
+      method: 'GET' as const,
+      path: '/api/session' as const,
+      responses: { 200: z.object({ expiresAt: z.number() }), 401: z.void() },
+    },
     logout: {
       method: 'POST' as const,
       path: '/api/logout' as const,
@@ -137,6 +142,7 @@ export const api = {
         toAccountNumber: z.string(),
         amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
         narration: z.string().optional(),
+        idempotencyKey: z.string().uuid(),
         rail: z.enum(["internal", "ach", "wire", "card"]).optional()
       }),
       responses: {

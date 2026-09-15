@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   phone: text("phone"),
   dateOfBirth: text("date_of_birth"),
   ssnLast4: text("ssn_last4"),
+  ssnLast4Encrypted: text("ssn_last4_encrypted"),
   address: text("address"),
   city: text("city"),
   state: text("state"),
@@ -55,6 +56,7 @@ export const accounts = pgTable("accounts", {
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   reference: text("reference").notNull().unique(),
+  idempotencyKey: text("idempotency_key").unique(),
   type: text("type", { enum: ["deposit", "transfer", "billpay", "adjustment_credit", "adjustment_debit", "mobile_deposit", "credit_card_purchase", "credit_card_payment", "fee_assessment", "fee_reversal"] }).notNull(),
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
   fromAccountId: integer("from_account_id"),
@@ -281,9 +283,14 @@ const strongPasswordSchema = z.string()
   .regex(/[a-z]/, "Password must include a lowercase letter")
   .regex(/[0-9]/, "Password must include a number");
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memberNumber: true }).extend({
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true, createdAt: true, memberNumber: true, role: true, status: true,
+  dashboardWidgets: true, avatarUrl: true, kycStatus: true, kycVerifiedAt: true,
+  ssnLast4Encrypted: true,
+}).extend({
   password: strongPasswordSchema,
   dashboardWidgets: z.array(z.string()).optional(),
+  ssnLast4: z.string().regex(/^\d{4}$/, "Enter exactly the last 4 SSN digits"),
 });
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true, createdAt: true, accountNumber: true, balance: true, status: true });
 export const insertApplicationSchema = createInsertSchema(accountApplications).omit({ id: true, createdAt: true, status: true, rejectionReason: true, riskScore: true, underwritingDecisionReason: true, adverseActionNote: true });

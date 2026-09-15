@@ -8,6 +8,7 @@ import { promisify } from "util";
 import { storage } from "./storage";
 import type { User as AppUser } from "@shared/schema";
 import { pool } from "./db";
+import { encryptSensitive } from "./security";
 
 declare global {
   namespace Express {
@@ -25,6 +26,9 @@ async function ensureSessionTable() {
     );
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "user_sessions" ("expire");`);
+  await pool.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "ssn_last4_encrypted" text;`);
+  await pool.query(`ALTER TABLE "transactions" ADD COLUMN IF NOT EXISTS "idempotency_key" text;`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "transactions_idempotency_key_idx" ON "transactions" ("idempotency_key") WHERE "idempotency_key" IS NOT NULL;`);
 }
 
 export async function setupAuth(app: Express) {
@@ -32,8 +36,11 @@ export async function setupAuth(app: Express) {
   if (!sessionSecret) {
     throw new Error("SESSION_SECRET must be set");
   }
-
   await ensureSessionTable();
+  const legacySsnRows = await pool.query<{ id: number; ssn_last4: string }>(`SELECT "id", "ssn_last4" FROM "users" WHERE "ssn_last4" IS NOT NULL AND "ssn_last4_encrypted" IS NULL`);
+  for (const row of legacySsnRows.rows) {
+    await pool.query(`UPDATE "users" SET "ssn_last4_encrypted" = $1, "ssn_last4" = NULL WHERE "id" = $2`, [encryptSensitive(row.ssn_last4), row.id]);
+  }
   const PgStore = connectPgSimple(session);
   const sessionSettings: session.SessionOptions = {
     name: "redbird.sid",

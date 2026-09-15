@@ -9,6 +9,7 @@ import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { rateLimit } from "express-rate-limit";
+import { encryptSensitive, sanitizeUser } from "./security";
 
 const SIMULATED_PRICES: Record<string, number> = {
   BTC: 97284.50, ETH: 3642.80, SOL: 178.45, ADA: 0.87,
@@ -47,10 +48,16 @@ export async function registerRoutes(
       const existingUser = await storage.getUserByUsername(input.email);
       if (existingUser) return res.status(409).json({ message: "An account already exists for this email" });
       const hashedPassword = await storage.hashPassword(input.password);
-      const user = await storage.createUser({ ...input, password: hashedPassword, status: "pending" });
+      const encryptedSsn = encryptSensitive(input.ssnLast4);
+      const user = await storage.createUser({
+        ...input,
+        password: hashedPassword,
+        ssnLast4: null,
+        ssnLast4Encrypted: encryptedSsn,
+        status: "pending",
+      } as any);
       await storage.createAuditLog(user.id, "REGISTER", req.ip);
-      const { password: _pw, ...safeUser } = user as any;
-      res.status(201).json({ ...safeUser, pending: true, message: "Your membership application has been submitted. A staff member will review and approve your account." });
+      res.status(201).json({ ...sanitizeUser(user as any), pending: true, message: "Your membership application has been submitted. A staff member will review and approve your account." });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
       next(err);
@@ -74,8 +81,7 @@ export async function registerRoutes(
           fullName: user.fullName,
           role: user.role,
         });
-        const { password: _pw, ...safeUser } = user;
-        return res.status(200).json(safeUser);
+        return res.status(200).json(sanitizeUser(user));
       });
     })(req, res, next);
   });
@@ -97,11 +103,15 @@ export async function registerRoutes(
 
   app.get(api.auth.me.path, (req, res) => {
     if (req.isAuthenticated()) {
-      const { password, ...safeUser } = req.user as any;
-      res.json(safeUser);
+      res.json(sanitizeUser(req.user as any));
     } else {
       res.status(401).send();
     }
+  });
+
+  app.get(api.auth.sessionStatus.path, (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send();
+    return res.json({ expiresAt: req.session.cookie.expires?.getTime() || Date.now() + 30 * 60_000 });
   });
 
   const requireAuth = (req: any, res: any, next: any) => {
@@ -131,6 +141,7 @@ export async function registerRoutes(
       const hashedPassword = await storage.hashPassword(input.newPassword);
       await db.update(users).set({ password: hashedPassword }).where(eq(users.id, user.id));
       await storage.createAuditLog(user.id, "PASSWORD_CHANGED", req.ip);
+      await storage.createNotification(user.id, "password_changed", "Your password was changed. Contact support immediately if this was not you.");
       return res.status(200).json({ message: "Password updated successfully" });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
@@ -176,8 +187,10 @@ export async function registerRoutes(
       const input = api.transactions.transfer.input.parse(req.body);
       const user = req.user as any;
       if (user.status === 'frozen') return res.status(403).json({ message: "Account is frozen" });
-      const tx = await storage.transfer(input.fromAccountId, input.toAccountNumber, input.amount, input.narration, input.rail);
-      await storage.createAuditLog(user.id, "TRANSFER", req.ip, { amount: input.amount });
+      const source = await storage.getAccount(input.fromAccountId);
+      if (!source || source.userId !== user.id) return res.status(403).json({ message: "Source account not found or not owned by you" });
+      const tx = await storage.transfer(input.fromAccountId, input.toAccountNumber, input.amount, input.narration, input.rail, input.idempotencyKey);
+      await storage.createAuditLog(user.id, "TRANSFER", req.ip, { amount: input.amount, transactionId: tx.id, idempotencyKey: input.idempotencyKey });
       await storage.createNotification(user.id, "transfer_posted", `Transfer of $${input.amount} has posted.`, { transactionId: tx.id });
       res.status(201).json(tx);
     } catch (err: any) { res.status(400).json({ message: err.message }); }
@@ -189,6 +202,8 @@ export async function registerRoutes(
       const user = req.user as any;
       let txs;
       if (accountId) {
+        const account = await storage.getAccount(accountId);
+        if (!account || account.userId !== user.id) return res.status(403).json({ message: "Account not found or not owned by you" });
         txs = await storage.getTransactionsByAccountId(accountId);
       } else {
         const userAccounts = await storage.getAccountsByUserId(user.id);
@@ -320,7 +335,7 @@ export async function registerRoutes(
   // Admin Routes
   app.get(api.admin.users.path, requireStaff, async (req, res) => {
     const allUsers = await storage.getAllUsers();
-    res.json(allUsers.map(({ password, ...u }) => u));
+    res.json(allUsers.map((user) => sanitizeUser(user as any)));
   });
 
   app.get(api.admin.auditLogs.path, requireStaff, async (_req, res) => {
@@ -354,8 +369,7 @@ export async function registerRoutes(
       const { status } = api.admin.updateUserStatus.input.parse(req.body);
       const user = await storage.updateUserStatus(id, status);
       await storage.createAuditLog((req.user as any).id, `USER_STATUS_${status.toUpperCase()}`, req.ip, `User ${id} status changed to ${status}`);
-      const { password: _pw, ...safeUser } = user as any;
-      res.json(safeUser);
+      res.json(sanitizeUser(user as any));
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
       res.status(500).json({ message: "Failed to update user status" });
@@ -367,8 +381,7 @@ export async function registerRoutes(
     const appsWithUsers = await Promise.all(apps.map(async (app) => {
       const user = await storage.getUser(app.userId);
       if (user) {
-        const { password, ...safeUser } = user as any;
-        return { ...app, user: safeUser };
+        return { ...app, user: sanitizeUser(user as any) };
       }
       return { ...app, user: null };
     }));
@@ -560,24 +573,20 @@ export async function registerRoutes(
     const cardsWithUsers = await Promise.all(cards.map(async (card) => {
       const user = await storage.getUser(card.userId);
       if (user) {
-        const { password, ...safeUser } = user as any;
-        return { ...card, user: safeUser };
+        return { ...card, user: sanitizeUser(user as any) };
       }
       return { ...card, user: null };
     }));
     res.json(cardsWithUsers);
   });
 
-  // Seed data
-  const staffUser = await storage.getUserByUsername("staff@demo.com");
-  if (!staffUser) {
-    const adminHash = await storage.hashPassword("Admin123!");
-    await storage.createUser({ email: "staff@demo.com", password: adminHash, fullName: "CU Staff", role: "staff", status: "active", phone: "0000000000" });
-  }
-  const adminUser = await storage.getUserByUsername("admin@demo.com");
-  if (!adminUser) {
-    const adminHash = await storage.hashPassword("Admin123!");
-    await storage.createUser({ email: "admin@demo.com", password: adminHash, fullName: "Admin User", role: "staff", status: "active", phone: "0000000000" });
+  // Never create predictable demo administrators in production.
+  if (process.env.NODE_ENV !== "production" && process.env.ALLOW_DEMO_SEED === "true") {
+    const staffUser = await storage.getUserByUsername("staff@demo.com");
+    if (!staffUser) {
+      const adminHash = await storage.hashPassword("Admin123!");
+      await storage.createUser({ email: "staff@demo.com", password: adminHash, fullName: "CU Staff", role: "staff", status: "active", phone: "0000000000" } as any);
+    }
   }
 
   return httpServer;

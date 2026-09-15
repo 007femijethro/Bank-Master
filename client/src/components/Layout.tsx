@@ -36,6 +36,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [phone, setPhone] = useState(user?.phone || "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [sessionWarning, setSessionWarning] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -92,9 +93,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
     const inactivityMs = 30 * 60 * 1000;
     let timeoutId: number;
+    let warningId: number;
+    let lastKeepAlive = 0;
 
     const resetTimer = () => {
       window.clearTimeout(timeoutId);
+      window.clearTimeout(warningId);
+      setSessionWarning(false);
+      if (Date.now() - lastKeepAlive > 60_000) {
+        lastKeepAlive = Date.now();
+        fetch(api.auth.sessionStatus.path, { credentials: "include" }).catch(() => {});
+      }
+      warningId = window.setTimeout(() => setSessionWarning(true), inactivityMs - 2 * 60 * 1000);
       timeoutId = window.setTimeout(() => {
         toast({ title: "Session Expired", description: "You were logged out after 30 minutes of inactivity." });
         logout.mutate();
@@ -107,6 +117,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
     return () => {
       window.clearTimeout(timeoutId);
+      window.clearTimeout(warningId);
       events.forEach((eventName) => window.removeEventListener(eventName, resetTimer));
     };
   }, [user, logout, toast]);
@@ -350,6 +361,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-gray-50/50 flex">
+      <Dialog open={sessionWarning} onOpenChange={setSessionWarning}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Your session is about to expire</DialogTitle><DialogDescription>For your security, you will be signed out after 30 minutes of inactivity. Interact with the page to continue your session.</DialogDescription></DialogHeader>
+          <DialogFooter><Button onClick={() => setSessionWarning(false)}>Continue session</Button><Button variant="outline" onClick={() => logout.mutate()}>Sign out now</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-72 bg-white border-r border-border fixed inset-y-0 z-30">
         <NavContent />

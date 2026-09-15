@@ -8,6 +8,8 @@
     "build": "NODE_OPTIONS=--dns-result-order=ipv4first tsx script/build.ts",
     "start": "NODE_OPTIONS=--dns-result-order=ipv4first NODE_ENV=production node dist/index.cjs",
     "check": "NODE_OPTIONS=--dns-result-order=ipv4first tsc",
+    "test": "NODE_OPTIONS=--dns-result-order=ipv4first node --import tsx --test tests/*.test.ts",
+    "test:integration": "NODE_OPTIONS=--dns-result-order=ipv4first node --import tsx --test tests/integration/*.integration.ts",
     "db:push": "NODE_OPTIONS=--dns-result-order=ipv4first drizzle-kit push --force"
   },
   "dependencies": {

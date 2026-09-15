@@ -60,6 +60,7 @@ export default function TransactionPage() {
       toAccountNumber: recipientAccount,
       amount,
       narration: narration || "Transfer",
+      idempotencyKey: crypto.randomUUID(),
     }, {
       onSuccess: () => {
         toast({ title: "Transfer Successful", description: `$${amount} sent to ${recipientInfo?.fullName || recipientAccount}.` });

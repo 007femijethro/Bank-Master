@@ -35,6 +35,9 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
         run: |
+          for required in DATABASE_URL SESSION_SECRET; do
+            if [ -z "${!required}" ]; then echo "Missing required GitHub secret: $required"; exit 1; fi
+          done
           {
             printf 'DATABASE_URL=%s\n' "$DATABASE_URL"
             printf 'SESSION_SECRET=%s\n' "$SESSION_SECRET"
