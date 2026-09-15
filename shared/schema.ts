@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   phone: text("phone"),
   dateOfBirth: text("date_of_birth"),
   ssnLast4: text("ssn_last4"),
+  ssnLast4Encrypted: text("ssn_last4_encrypted"),
   address: text("address"),
   city: text("city"),
   state: text("state"),
@@ -24,8 +25,26 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   kycStatus: text("kyc_status", { enum: ["pending", "verified", "rejected"] }).default("pending").notNull(),
   kycVerifiedAt: timestamp("kyc_verified_at"),
+  emailVerified: boolean("email_verified").default(true).notNull(),
+  twoFactorEnabled: boolean("two_factor_enabled").default(true).notNull(),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const securityTokens = pgTable("security_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  type: text("type", { enum: ["email_verification", "password_reset", "login_otp", "transfer_otp"] }).notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  context: jsonb("context").$type<Record<string, unknown>>(),
+  attempts: integer("attempts").default(0).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  consumedAt: timestamp("consumed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  tokenHashIdx: index("security_tokens_token_hash_idx").on(table.tokenHash),
+  userIdx: index("security_tokens_user_idx").on(table.userId),
+}));
 
 export const accountApplications = pgTable("account_applications", {
   id: serial("id").primaryKey(),
@@ -281,9 +300,14 @@ const strongPasswordSchema = z.string()
   .regex(/[a-z]/, "Password must include a lowercase letter")
   .regex(/[0-9]/, "Password must include a number");
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memberNumber: true }).extend({
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true, createdAt: true, memberNumber: true, role: true, status: true,
+  dashboardWidgets: true, avatarUrl: true, kycStatus: true, kycVerifiedAt: true,
+  emailVerified: true, twoFactorEnabled: true, lastLoginAt: true, ssnLast4Encrypted: true,
+}).extend({
   password: strongPasswordSchema,
   dashboardWidgets: z.array(z.string()).optional(),
+  ssnLast4: z.string().regex(/^\d{4}$/, "Enter exactly the last 4 SSN digits"),
 });
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true, createdAt: true, accountNumber: true, balance: true, status: true });
 export const insertApplicationSchema = createInsertSchema(accountApplications).omit({ id: true, createdAt: true, status: true, rejectionReason: true, riskScore: true, underwritingDecisionReason: true, adverseActionNote: true });
