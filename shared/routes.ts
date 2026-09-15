@@ -34,42 +34,8 @@ export const api = {
       input: z.object({ username: z.string(), password: z.string() }),
       responses: {
         200: z.custom<typeof users.$inferSelect>(),
-        202: z.object({ requiresTwoFactor: z.literal(true), challenge: z.string(), message: z.string() }),
         401: z.object({ message: z.string() }),
       },
-    },
-    verifyLoginOtp: {
-      method: 'POST' as const,
-      path: '/api/login/verify-otp' as const,
-      input: z.object({ challenge: z.string().min(20), code: z.string().regex(/^\d{6}$/) }),
-      responses: { 200: z.custom<typeof users.$inferSelect>(), 400: errorSchemas.validation },
-    },
-    verifyEmail: {
-      method: 'POST' as const,
-      path: '/api/email/verify' as const,
-      input: z.object({ token: z.string().min(20) }),
-      responses: { 200: z.object({ message: z.string() }), 400: errorSchemas.validation },
-    },
-    resendVerification: {
-      method: 'POST' as const,
-      path: '/api/email/resend-verification' as const,
-      input: z.object({ email: z.string().email() }),
-      responses: { 200: z.object({ message: z.string() }) },
-    },
-    forgotPassword: {
-      method: 'POST' as const,
-      path: '/api/password/forgot' as const,
-      input: z.object({ email: z.string().email() }),
-      responses: { 200: z.object({ message: z.string() }) },
-    },
-    resetPassword: {
-      method: 'POST' as const,
-      path: '/api/password/reset' as const,
-      input: z.object({
-        token: z.string().min(20),
-        newPassword: z.string().min(10).regex(/[A-Z]/).regex(/[a-z]/).regex(/[0-9]/),
-      }),
-      responses: { 200: z.object({ message: z.string() }), 400: errorSchemas.validation },
     },
     sessionStatus: {
       method: 'GET' as const,
@@ -176,24 +142,13 @@ export const api = {
         toAccountNumber: z.string(),
         amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
         narration: z.string().optional(),
-        otpChallenge: z.string().min(20),
-        otpCode: z.string().regex(/^\d{6}$/),
+        idempotencyKey: z.string().uuid(),
         rail: z.enum(["internal", "ach", "wire", "card"]).optional()
       }),
       responses: {
         201: z.custom<typeof transactions.$inferSelect>(),
         400: errorSchemas.validation,
       },
-    },
-    requestTransferOtp: {
-      method: 'POST' as const,
-      path: '/api/transactions/transfer/request-otp' as const,
-      input: z.object({
-        fromAccountId: z.number(),
-        toAccountNumber: z.string().min(1),
-        amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
-      }),
-      responses: { 200: z.object({ challenge: z.string(), message: z.string() }), 400: errorSchemas.validation },
     },
     billpay: {
       method: 'POST' as const,
