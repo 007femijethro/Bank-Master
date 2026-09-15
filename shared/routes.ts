@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertUserSchema, users, accounts, transactions, auditLogs, accountApplications, mobileDeposits, cryptoHoldings } from './schema';
+import { insertUserSchema, users, accounts, transactions, auditLogs, accountApplications, mobileDeposits, cryptoHoldings, beneficiaries } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -217,6 +217,16 @@ export const api = {
         200: z.any(),
       },
     },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/notifications/:id' as const,
+      responses: { 204: z.void() },
+    },
+  },
+  beneficiaries: {
+    list: { method: 'GET' as const, path: '/api/beneficiaries' as const, responses: { 200: z.array(z.custom<typeof beneficiaries.$inferSelect>()) } },
+    create: { method: 'POST' as const, path: '/api/beneficiaries' as const, input: z.object({ nickname: z.string().min(1).max(50), accountNumber: z.string().regex(/^\d{10}$/) }), responses: { 201: z.custom<typeof beneficiaries.$inferSelect>() } },
+    delete: { method: 'DELETE' as const, path: '/api/beneficiaries/:id' as const, responses: { 204: z.void() } },
   },
   mobileDeposit: {
     create: {

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, UserX, UserCheck, ShieldAlert, Check, X, DollarSign, Smartphone, Eye, Receipt } from "lucide-react";
+import { Loader2, UserX, UserCheck, ShieldAlert, Check, X, DollarSign, Smartphone, Eye, Receipt, Users, Clock3, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -35,6 +35,7 @@ export default function AdminDashboard() {
   const [adjustType, setAdjustType] = useState<"adjustment_credit" | "adjustment_debit">("adjustment_credit");
   const [adjustReason, setAdjustReason] = useState("");
   const [formDataDialog, setFormDataDialog] = useState<any>(null);
+  const [memberSearch, setMemberSearch] = useState("");
 
   const { data: mobileDeposits, isLoading: loadingDeposits } = useQuery({
     queryKey: ["/api/admin/mobile-deposits"],
@@ -90,6 +91,11 @@ export default function AdminDashboard() {
   });
 
   const financialByUserId = new Map((memberFinancials || []).map((f) => [f.userId, f]));
+  const filteredUsers = (users || []).filter((member: any) => `${member.fullName} ${member.email} ${member.memberNumber || ""}`.toLowerCase().includes(memberSearch.toLowerCase()));
+  const totalManagedBalance = (memberFinancials || []).reduce((sum: number, item: any) => sum + Number(item.totalBalance || 0), 0);
+  const pendingReviewCount = (applications || []).filter((item: any) => item.status === "pending").length
+    + (mobileDeposits || []).filter((item: any) => item.status === "pending").length
+    + (pendingTransactions || []).length;
 
   if (user?.role !== 'staff') {
     return <Redirect to="/dashboard" />;
@@ -164,8 +170,15 @@ export default function AdminDashboard() {
         <p className="text-muted-foreground">Manage members, applications, mobile deposits, and account adjustments</p>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card><CardContent className="flex items-center justify-between p-5"><div><p className="text-sm text-muted-foreground">Total members</p><p className="text-2xl font-bold">{users?.length || 0}</p></div><Users className="h-8 w-8 text-primary/70" /></CardContent></Card>
+        <Card><CardContent className="flex items-center justify-between p-5"><div><p className="text-sm text-muted-foreground">Pending reviews</p><p className="text-2xl font-bold">{pendingReviewCount}</p></div><Clock3 className="h-8 w-8 text-amber-500" /></CardContent></Card>
+        <Card><CardContent className="flex items-center justify-between p-5"><div><p className="text-sm text-muted-foreground">Managed balance</p><p className="text-2xl font-bold">${totalManagedBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p></div><DollarSign className="h-8 w-8 text-green-600" /></CardContent></Card>
+        <Card><CardContent className="flex items-center justify-between p-5"><div><p className="text-sm text-muted-foreground">Restricted accounts</p><p className="text-2xl font-bold">{(users || []).filter((member: any) => member.status === "frozen" || member.status === "locked").length}</p></div><ShieldAlert className="h-8 w-8 text-destructive/70" /></CardContent></Card>
+      </div>
+
       <Tabs key={defaultTab} defaultValue={defaultTab} className="space-y-6">
-        <TabsList>
+        <TabsList className="h-auto w-full justify-start overflow-x-auto">
           <TabsTrigger value="users" data-testid="tab-admin-users">Members
             {users?.filter((u: any) => u.status === 'pending').length ? (
               <Badge variant="destructive" className="ml-2">{users.filter((u: any) => u.status === 'pending').length}</Badge>
@@ -196,10 +209,14 @@ export default function AdminDashboard() {
               <CardDescription>View members, balances, assets, and adjust balances.</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="relative mb-4 max-w-md">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input className="pl-9" value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} placeholder="Search by name, email, or member number" />
+              </div>
               {loadingUsers ? (
                 <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>
               ) : (
-                <div className="rounded-md border">
+                <div className="overflow-x-auto rounded-md border">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
@@ -211,7 +228,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {users?.map((u) => (
+                      {filteredUsers.map((u) => (
                         <tr key={u.id} className="border-b last:border-0">
                           <td className="p-3">
                             <div className="font-medium">{u.fullName}</div>

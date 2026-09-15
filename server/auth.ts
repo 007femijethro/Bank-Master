@@ -29,6 +29,8 @@ async function ensureSessionTable() {
   await pool.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "ssn_last4_encrypted" text;`);
   await pool.query(`ALTER TABLE "transactions" ADD COLUMN IF NOT EXISTS "idempotency_key" text;`);
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "transactions_idempotency_key_idx" ON "transactions" ("idempotency_key") WHERE "idempotency_key" IS NOT NULL;`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS "beneficiaries" ("id" serial PRIMARY KEY, "user_id" integer NOT NULL, "nickname" text NOT NULL, "account_number" text NOT NULL, "created_at" timestamp DEFAULT NOW(), UNIQUE("user_id", "account_number"));`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS "beneficiaries_user_idx" ON "beneficiaries" ("user_id");`);
 }
 
 export async function setupAuth(app: Express) {

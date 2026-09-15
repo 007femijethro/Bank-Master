@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, CreditCard, Settings2, Check, History, Coins, Home, Eye, EyeOff } from "lucide-react";
+import { Plus, Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, CreditCard, Settings2, Check, History, Coins, Home, Eye, EyeOff, Bell, Trash2, Send, Receipt } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,6 +17,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Link } from "wouter";
+import { useNotifications } from "@/hooks/use-product";
 
 const CRYPTO_DATA = [
   { symbol: "BTC", name: "Bitcoin", basePrice: 97284.50 },
@@ -34,11 +35,14 @@ export default function CustomerDashboard() {
   const { data: accounts, isLoading } = useAccounts();
   const { data: transactions } = useTransactions();
   const createAccount = useCreateAccount();
+  const notifications = useNotifications();
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [accountType, setAccountType] = useState<"share_savings" | "checking" | "loan" | "home_equity" | "credit_card">("share_savings");
   const [showCardDetails, setShowCardDetails] = useState(false);
+  const [showBalances, setShowBalances] = useState(true);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   
   const queryClient = useQueryClient();
 
@@ -84,6 +88,7 @@ export default function CustomerDashboard() {
   });
 
   const totalBalance = accounts?.reduce((sum, acc) => sum + Number(acc.balance), 0) || 0;
+  const unreadNotifications = (notifications.data || []).filter((item: any) => !item.read).length;
   const recentTransactions = transactions?.slice(0, 5) || [];
   const userAccountIds = new Set((accounts || []).map((acc) => acc.id));
 
@@ -148,6 +153,36 @@ export default function CustomerDashboard() {
         </div>
         
         <div className="flex gap-2">
+          <Dialog open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="icon" className="relative" aria-label="Notifications">
+                <Bell className="h-4 w-4" />
+                {unreadNotifications > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">{unreadNotifications}</span>}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Notifications</DialogTitle>
+                <DialogDescription>Important updates about your accounts and transactions.</DialogDescription>
+              </DialogHeader>
+              <div className="max-h-[55vh] space-y-2 overflow-y-auto">
+                {notifications.data?.length ? notifications.data.map((item: any) => (
+                  <div key={item.id} className={`rounded-lg border p-3 ${item.read ? "bg-background" : "border-primary/30 bg-primary/5"}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <button className="flex-1 text-left" onClick={() => !item.read && notifications.markRead.mutate(item.id)}>
+                        <p className="text-sm font-semibold capitalize">{String(item.eventType || "Account update").replaceAll("_", " ")}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{item.message}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">{format(new Date(item.createdAt), "MMM d, h:mm a")}</p>
+                      </button>
+                      <Button variant="ghost" size="icon" onClick={() => notifications.remove.mutate(item.id)} aria-label="Delete notification">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )) : <div className="py-10 text-center text-sm text-muted-foreground">You’re all caught up.</div>}
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="icon">
@@ -235,9 +270,17 @@ export default function CustomerDashboard() {
       </div>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Link href="/transactions"><Button variant="outline" className="h-14 w-full justify-start"><Send className="mr-3 h-5 w-5 text-primary" /> Send money</Button></Link>
+        <Link href="/transactions"><Button variant="outline" className="h-14 w-full justify-start"><Receipt className="mr-3 h-5 w-5 text-primary" /> Pay a bill</Button></Link>
+        <Button variant="outline" className="h-14 w-full justify-start" onClick={() => setShowBalances((value) => !value)}>
+          {showBalances ? <EyeOff className="mr-3 h-5 w-5 text-primary" /> : <Eye className="mr-3 h-5 w-5 text-primary" />} {showBalances ? "Hide balances" : "Show balances"}
+        </Button>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {currentWidgets.includes("balance") && (
-          <StatCard title="Total Balance" value={`$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Wallet} className="bg-primary text-primary-foreground border-none" />
+          <StatCard title="Total Balance" value={showBalances ? `$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "••••••"} icon={Wallet} className="bg-primary text-primary-foreground border-none" />
         )}
         {currentWidgets.includes("crypto") && cryptoTotalValue > 0 && (
           <Link href="/crypto">
@@ -343,9 +386,9 @@ export default function CustomerDashboard() {
                 <CardContent>
                   <div className="space-y-1">
                     <div className="text-sm text-muted-foreground">Current Balance</div>
-                    <div className="text-2xl font-bold">${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                    <div className="text-2xl font-bold">{showBalances ? `$${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "••••••"}</div>
                     <div className="text-sm text-muted-foreground mt-2">Available Balance</div>
-                    <div className="text-lg font-semibold">${Number(acc.availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                    <div className="text-lg font-semibold">{showBalances ? `$${Number(acc.availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "••••••"}</div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2 font-mono">{acc.accountNumber}</p>
                 </CardContent>

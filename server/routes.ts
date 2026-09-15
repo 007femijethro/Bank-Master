@@ -6,8 +6,8 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import passport from "passport";
 import { db } from "./db";
-import { users } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { beneficiaries, notifications, users } from "@shared/schema";
+import { and, eq } from "drizzle-orm";
 import { rateLimit } from "express-rate-limit";
 import { encryptSensitive, sanitizeUser } from "./security";
 
@@ -495,6 +495,38 @@ export async function registerRoutes(
     const user = req.user as any;
     const result = await storage.markNotificationRead(Number(req.params.id), user.id);
     res.json(result);
+  });
+
+  app.delete(api.notifications.delete.path, requireAuth, async (req, res) => {
+    const user = req.user as any;
+    await db.delete(notifications).where(and(eq(notifications.id, Number(req.params.id)), eq(notifications.userId, user.id)));
+    res.status(204).send();
+  });
+
+  app.get(api.beneficiaries.list.path, requireAuth, async (req, res) => {
+    const user = req.user as any;
+    res.json(await db.select().from(beneficiaries).where(eq(beneficiaries.userId, user.id)));
+  });
+
+  app.post(api.beneficiaries.create.path, requireAuth, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const input = api.beneficiaries.create.input.parse(req.body);
+      const account = await storage.getAccountByNumber(input.accountNumber);
+      if (!account) return res.status(400).json({ message: "Account number was not found" });
+      if (account.userId === user.id) return res.status(400).json({ message: "You cannot save your own account as a beneficiary" });
+      const [saved] = await db.insert(beneficiaries).values({ userId: user.id, ...input }).returning();
+      await storage.createAuditLog(user.id, "BENEFICIARY_ADDED", req.ip, { beneficiaryId: saved.id });
+      res.status(201).json(saved);
+    } catch (err: any) {
+      res.status(400).json({ message: err instanceof z.ZodError ? err.errors[0].message : "Beneficiary already exists" });
+    }
+  });
+
+  app.delete(api.beneficiaries.delete.path, requireAuth, async (req, res) => {
+    const user = req.user as any;
+    await db.delete(beneficiaries).where(and(eq(beneficiaries.id, Number(req.params.id)), eq(beneficiaries.userId, user.id)));
+    res.status(204).send();
   });
 
   // User profile/widget routes
