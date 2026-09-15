@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { Link, Redirect } from "wouter";
+import { Redirect } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,14 +82,12 @@ const registerSchema = z.object({
 });
 
 export default function AuthPage() {
-  const { user, login, verifyLoginOtp, register } = useAuth();
+  const { user, login, register } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("login");
   const [registrationPending, setRegistrationPending] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
-  const [otpChallenge, setOtpChallenge] = useState("");
-  const [otpCode, setOtpCode] = useState("");
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -111,12 +109,6 @@ export default function AuthPage() {
 
   function onLogin(data: z.infer<typeof loginSchema>) {
     login.mutate(data, {
-      onSuccess: (response: any) => {
-        if (response.requiresTwoFactor) {
-          setOtpChallenge(response.challenge);
-          toast({ title: "Security code sent", description: response.message });
-        }
-      },
       onError: (e) => {
         toast({
           variant: "destructive",
@@ -124,12 +116,6 @@ export default function AuthPage() {
           description: e.message,
         });
       },
-    });
-  }
-
-  function onVerifyOtp() {
-    verifyLoginOtp.mutate({ challenge: otpChallenge, code: otpCode }, {
-      onError: (e) => toast({ variant: "destructive", title: "Code not accepted", description: e.message }),
     });
   }
 
@@ -207,14 +193,7 @@ export default function AuthPage() {
                 <CardDescription>Enter your credentials to access your account.</CardDescription>
               </CardHeader>
               <CardContent>
-                {otpChallenge ? (
-                  <div className="space-y-4">
-                    <Alert><ShieldCheck className="h-4 w-4" /><AlertTitle>Two-step verification</AlertTitle><AlertDescription>Enter the 6-digit code sent to your email. It expires in 10 minutes.</AlertDescription></Alert>
-                    <div className="space-y-2"><FormLabel>Security code</FormLabel><Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" className="text-center text-2xl tracking-[0.5em]" /></div>
-                    <Button className="w-full" onClick={onVerifyOtp} disabled={otpCode.length !== 6 || verifyLoginOtp.isPending}>{verifyLoginOtp.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verify and sign in</Button>
-                    <Button variant="ghost" className="w-full" onClick={() => { setOtpChallenge(""); setOtpCode(""); }}>Back to login</Button>
-                  </div>
-                ) : <Form {...loginForm}>
+                <Form {...loginForm}>
                   <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
                     <FormField
                       control={loginForm.control}
@@ -229,7 +208,6 @@ export default function AuthPage() {
                         </FormItem>
                       )}
                     />
-                    <div className="flex justify-between gap-3 text-sm"><Link href="/resend-verification" className="text-primary hover:underline">Resend verification</Link><Link href="/forgot-password" className="text-primary hover:underline">Forgot password?</Link></div>
                     <FormField
                       control={loginForm.control}
                       name="password"
@@ -253,7 +231,7 @@ export default function AuthPage() {
                       Secure Login
                     </Button>
                   </form>
-                </Form>}
+                </Form>
               </CardContent>
             </Card>
           </TabsContent>
