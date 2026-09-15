@@ -34,10 +34,28 @@ jobs:
           EC2_USER: ${{ secrets.EC2_USER }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
         run: |
+          for required in DATABASE_URL SESSION_SECRET DATA_ENCRYPTION_KEY SMTP_HOST SMTP_USER SMTP_PASSWORD SMTP_FROM; do
+            if [ -z "${!required}" ]; then echo "Missing required GitHub secret: $required"; exit 1; fi
+          done
           {
             printf 'DATABASE_URL=%s\n' "$DATABASE_URL"
             printf 'SESSION_SECRET=%s\n' "$SESSION_SECRET"
+            printf 'DATA_ENCRYPTION_KEY=%s\n' "$DATA_ENCRYPTION_KEY"
+            printf 'PUBLIC_URL=https://redbirdfcu.com\n'
+            printf 'SMTP_HOST=%s\n' "$SMTP_HOST"
+            printf 'SMTP_PORT=%s\n' "${SMTP_PORT:-587}"
+            printf 'SMTP_SECURE=%s\n' "${SMTP_SECURE:-false}"
+            printf 'SMTP_USER=%s\n' "$SMTP_USER"
+            printf 'SMTP_PASSWORD=%s\n' "$SMTP_PASSWORD"
+            printf 'SMTP_FROM=%s\n' "$SMTP_FROM"
             printf 'COOKIE_SECURE=true\n'
             printf 'PORT=5000\n'
           } | ssh -i ~/.ssh/bank-master.pem "$EC2_USER@$EC2_HOST"               'sudo sh -c "umask 077 && cat > /opt/bank-master.env"'
