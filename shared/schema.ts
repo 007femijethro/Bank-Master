@@ -110,6 +110,16 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const beneficiaries = pgTable("beneficiaries", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  nickname: text("nickname").notNull(),
+  accountNumber: text("account_number").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  userIdx: index("beneficiaries_user_idx").on(table.userId),
+}));
+
 export const creditCards = pgTable("credit_cards", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
@@ -302,6 +312,7 @@ export type User = typeof users.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type Beneficiary = typeof beneficiaries.$inferSelect;
 export type AccountApplication = typeof accountApplications.$inferSelect;
 export type MobileDeposit = typeof mobileDeposits.$inferSelect;
 export type CryptoHolding = typeof cryptoHoldings.$inferSelect;
