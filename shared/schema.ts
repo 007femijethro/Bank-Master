@@ -275,7 +275,14 @@ export const cryptoHoldingsRelations = relations(cryptoHoldings, ({ one }) => ({
 
 // === BASE SCHEMAS ===
 
+const strongPasswordSchema = z.string()
+  .min(10, "Password must be at least 10 characters")
+  .regex(/[A-Z]/, "Password must include an uppercase letter")
+  .regex(/[a-z]/, "Password must include a lowercase letter")
+  .regex(/[0-9]/, "Password must include a number");
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, memberNumber: true }).extend({
+  password: strongPasswordSchema,
   dashboardWidgets: z.array(z.string()).optional(),
 });
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true, createdAt: true, accountNumber: true, balance: true, status: true });

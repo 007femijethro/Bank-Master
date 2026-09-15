@@ -90,13 +90,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) return;
 
-    const inactivityMs = 3 * 60 * 1000;
+    const inactivityMs = 30 * 60 * 1000;
     let timeoutId: number;
 
     const resetTimer = () => {
       window.clearTimeout(timeoutId);
       timeoutId = window.setTimeout(() => {
-        toast({ title: "Session Expired", description: "You were logged out after 3 minutes of inactivity." });
+        toast({ title: "Session Expired", description: "You were logged out after 30 minutes of inactivity." });
         logout.mutate();
       }, inactivityMs);
     };
@@ -315,7 +315,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   type="button"
                   variant="secondary"
                   className="w-full"
-                  disabled={changePassword.isPending || !currentPassword || newPassword.length < 6}
+                  disabled={changePassword.isPending || !currentPassword || newPassword.length < 10}
                   onClick={() => changePassword.mutate({ currentPassword, newPassword })}
                 >
                   {changePassword.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}

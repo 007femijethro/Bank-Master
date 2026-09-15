@@ -1,0 +1,8 @@
+.git
+.github
+node_modules
+dist
+.env
+*.log
+*.tar.gz
+attached_assets

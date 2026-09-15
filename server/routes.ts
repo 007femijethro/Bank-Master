@@ -8,6 +8,7 @@ import passport from "passport";
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { rateLimit } from "express-rate-limit";
 
 const SIMULATED_PRICES: Record<string, number> = {
   BTC: 97284.50, ETH: 3642.80, SOL: 178.45, ADA: 0.87,
@@ -24,11 +25,27 @@ export async function registerRoutes(
 ): Promise<Server> {
   await setupAuth(app);
 
-  app.post(api.auth.register.path, async (req, res, next) => {
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { message: "Too many attempts. Please wait 15 minutes and try again." },
+  });
+
+  const registrationLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 5,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { message: "Too many applications from this connection. Please try again later." },
+  });
+
+  app.post(api.auth.register.path, registrationLimiter, async (req, res, next) => {
     try {
       const input = api.auth.register.input.parse(req.body);
       const existingUser = await storage.getUserByUsername(input.email);
-      if (existingUser) return res.status(400).json({ message: "Username already exists" });
+      if (existingUser) return res.status(409).json({ message: "An account already exists for this email" });
       const hashedPassword = await storage.hashPassword(input.password);
       const user = await storage.createUser({ ...input, password: hashedPassword, status: "pending" });
       await storage.createAuditLog(user.id, "REGISTER", req.ip);
@@ -40,7 +57,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.auth.login.path, (req, res, next) => {
+  app.post(api.auth.login.path, authLimiter, (req, res, next) => {
     passport.authenticate("local", async (err: any, user: any, info: any) => {
       if (err) return next(err);
       if (!user) {

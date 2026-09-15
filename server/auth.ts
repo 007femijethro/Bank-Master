@@ -28,15 +28,24 @@ async function ensureSessionTable() {
 }
 
 export async function setupAuth(app: Express) {
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) {
+    throw new Error("SESSION_SECRET must be set");
+  }
+
   await ensureSessionTable();
   const PgStore = connectPgSimple(session);
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "r3pl1t_s3cr3t_k3y",
+    name: "redbird.sid",
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     rolling: true,
     cookie: {
-      maxAge: 3 * 60 * 1000,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false,
+      maxAge: 30 * 60 * 1000,
     },
     store: new PgStore({
       pool: pool,
@@ -48,8 +57,10 @@ export async function setupAuth(app: Express) {
   if (app.get("env") === "production") {
     app.set("trust proxy", 1);
     sessionSettings.cookie = {
-      secure: true,
-      maxAge: 3 * 60 * 1000,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.COOKIE_SECURE !== "false",
+      maxAge: 30 * 60 * 1000,
     };
   }
 
