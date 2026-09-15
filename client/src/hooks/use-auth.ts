@@ -38,11 +38,20 @@ export function useAuth() {
         body: JSON.stringify(data),
         credentials: "include",
       });
+      if (res.status === 202) return api.auth.login.responses[202].parse(await res.json());
       return handleResponse(res, api.auth.login.responses[200]);
     },
     onSuccess: (data) => {
-      queryClient.setQueryData([api.auth.me.path], data);
+      if (!("requiresTwoFactor" in (data as any))) queryClient.setQueryData([api.auth.me.path], data);
     },
+  });
+
+  const verifyLoginOtpMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof api.auth.verifyLoginOtp.input>) => {
+      const res = await fetch(api.auth.verifyLoginOtp.path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data), credentials: "include" });
+      return handleResponse(res, api.auth.verifyLoginOtp.responses[200]);
+    },
+    onSuccess: (data) => queryClient.setQueryData([api.auth.me.path], data),
   });
 
   const registerMutation = useMutation({
@@ -83,6 +92,7 @@ export function useAuth() {
     user: userQuery.data,
     isLoading: userQuery.isLoading,
     login: loginMutation,
+    verifyLoginOtp: verifyLoginOtpMutation,
     register: registerMutation,
     logout: logoutMutation,
   };
