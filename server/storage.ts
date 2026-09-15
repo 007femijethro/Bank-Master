@@ -1,6 +1,6 @@
 import { users, accounts, transactions, auditLogs, accountApplications, mobileDeposits, cryptoHoldings, creditCards, holds, statements, notifications, type User, type InsertUser, type Account, type Transaction, type AuditLog, type AccountApplication, type InsertApplication, type MobileDeposit, type CryptoHolding, type CreditCard, type Hold, type Statement, type Notification } from "@shared/schema";
 import { db } from "./db";
-import { eq, or, desc, and, inArray } from "drizzle-orm";
+import { eq, or, desc, and, inArray, sql } from "drizzle-orm";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 
@@ -72,7 +72,7 @@ export interface IStorage {
   postPendingTransactionsForSettlement(): Promise<number>;
   
   deposit(accountId: number, amount: string, narration?: string): Promise<Transaction>;
-  transfer(fromAccountId: number, toAccountNumber: string, amount: string, narration?: string, rail?: TransferRail): Promise<Transaction>;
+  transfer(fromAccountId: number, toAccountNumber: string, amount: string, narration?: string, rail?: TransferRail, idempotencyKey?: string): Promise<Transaction>;
   billpay(fromAccountId: number, billerType: string, amount: string, narration?: string): Promise<Transaction>;
   reviewTransaction(id: number, status: "approved" | "rejected", reviewedBy: number, reason?: string): Promise<Transaction>;
   adjustBalance(accountId: number, amount: string, type: "adjustment_credit" | "adjustment_debit", staffUserId: number, reasonCode: string, narration?: string): Promise<Transaction>;
@@ -278,11 +278,26 @@ export class DatabaseStorage implements IStorage {
     return transaction;
   }
 
-  async transfer(fromAccountId: number, toAccountNumber: string, amount: string, narration?: string, rail: TransferRail = "internal"): Promise<Transaction> {
+  async transfer(fromAccountId: number, toAccountNumber: string, amount: string, narration?: string, rail: TransferRail = "internal", idempotencyKey?: string): Promise<Transaction> {
     return await db.transaction(async (tx) => {
+      if (idempotencyKey) {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${idempotencyKey}))`);
+        const [existing] = await tx.select().from(transactions).where(eq(transactions.idempotencyKey, idempotencyKey));
+        if (existing) {
+          if (existing.fromAccountId !== fromAccountId) throw new Error("Idempotency key was already used for a different transfer");
+          return existing;
+        }
+      }
+
+      const [recipientLookup] = await tx.select({ id: accounts.id }).from(accounts).where(eq(accounts.accountNumber, toAccountNumber));
+      if (!recipientLookup) throw new Error("Account not found");
+      const lockIds = [fromAccountId, recipientLookup.id].sort((a, b) => a - b);
+      await tx.execute(sql`SELECT id FROM accounts WHERE id IN (${sql.join(lockIds.map(id => sql`${id}`), sql`, `)}) ORDER BY id FOR UPDATE`);
+
       const [fromAccount] = await tx.select().from(accounts).where(eq(accounts.id, fromAccountId));
-      const [toAccount] = await tx.select().from(accounts).where(eq(accounts.accountNumber, toAccountNumber));
+      const [toAccount] = await tx.select().from(accounts).where(eq(accounts.id, recipientLookup.id));
       if (!fromAccount || !toAccount) throw new Error("Account not found");
+      if (fromAccount.id === toAccount.id) throw new Error("Source and destination accounts must be different");
       const amt = toAmount(amount);
       const cfg = TRANSFER_RAIL_CONFIG[rail];
       if (!cfg) throw new Error("Unsupported transfer rail");
@@ -307,6 +322,7 @@ export class DatabaseStorage implements IStorage {
       const settlementEstimatedAt = buildSettlementDate(rail);
       const [transaction] = await tx.insert(transactions).values({
         reference: `TRF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        idempotencyKey: idempotencyKey || null,
         type: "transfer",
         amount,
         fromAccountId,
