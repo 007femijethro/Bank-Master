@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useAccounts, useTransactions, useDeposit, useTransfer, useBillPay, useAccountLookup } from "@/hooks/use-accounts";
+import { useAccounts, useTransactions, useDeposit, useTransfer, useRequestTransferOtp, useBillPay, useAccountLookup } from "@/hooks/use-accounts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,7 @@ export default function TransactionPage() {
   const { data: transactions } = useTransactions();
   const deposit = useDeposit();
   const transfer = useTransfer();
+  const requestTransferOtp = useRequestTransferOtp();
   const billPay = useBillPay();
   const { toast } = useToast();
 
@@ -27,6 +28,8 @@ export default function TransactionPage() {
   const [amount, setAmount] = useState("");
   const [narration, setNarration] = useState("");
   const [billerType, setBillerType] = useState("");
+  const [transferChallenge, setTransferChallenge] = useState("");
+  const [transferOtp, setTransferOtp] = useState("");
   
   // Lookup recipient name
   const { data: recipientInfo, isFetching: isLookingUp } = useAccountLookup(recipientAccount);
@@ -36,6 +39,8 @@ export default function TransactionPage() {
     setNarration("");
     setRecipientAccount("");
     setBillerType("");
+    setTransferChallenge("");
+    setTransferOtp("");
   };
 
   const handleDeposit = () => {
@@ -55,11 +60,20 @@ export default function TransactionPage() {
 
   const handleTransfer = () => {
     if (!selectedAccount || !recipientAccount || !amount) return;
+    if (!transferChallenge) {
+      requestTransferOtp.mutate({ fromAccountId: Number(selectedAccount), toAccountNumber: recipientAccount, amount }, {
+        onSuccess: (response) => { setTransferChallenge(response.challenge); toast({ title: "Security code sent", description: response.message }); },
+        onError: (e) => toast({ variant: "destructive", title: "Could not send code", description: e.message }),
+      });
+      return;
+    }
     transfer.mutate({
       fromAccountId: Number(selectedAccount),
       toAccountNumber: recipientAccount,
       amount,
       narration: narration || "Transfer",
+      otpChallenge: transferChallenge,
+      otpCode: transferOtp,
     }, {
       onSuccess: () => {
         toast({ title: "Transfer Successful", description: `$${amount} sent to ${recipientInfo?.fullName || recipientAccount}.` });
@@ -213,13 +227,15 @@ export default function TransactionPage() {
                 <Input value={narration} onChange={(e) => setNarration(e.target.value)} placeholder="e.g. Lunch money" />
               </div>
 
+              {transferChallenge && <Alert><AlertDescription className="space-y-3"><span className="block">Enter the 6-digit code sent to your email to authorize this exact transfer.</span><Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={transferOtp} onChange={(e) => setTransferOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" className="text-center text-xl tracking-[0.4em]" /></AlertDescription></Alert>}
+
               <Button 
                 className="w-full" 
                 onClick={handleTransfer} 
-                disabled={!selectedAccount || !recipientAccount || !amount || transfer.isPending}
+                disabled={!selectedAccount || !recipientAccount || !amount || transfer.isPending || requestTransferOtp.isPending || (!!transferChallenge && transferOtp.length !== 6)}
               >
-                {transfer.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRight className="w-4 h-4 mr-2" />}
-                Send Money
+                {(transfer.isPending || requestTransferOtp.isPending) ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRight className="w-4 h-4 mr-2" />}
+                {transferChallenge ? "Verify and Send Money" : "Send Security Code"}
               </Button>
             </CardContent>
           </Card>
