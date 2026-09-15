@@ -8,6 +8,8 @@
     "build": "NODE_OPTIONS=--dns-result-order=ipv4first tsx script/build.ts",
     "start": "NODE_OPTIONS=--dns-result-order=ipv4first NODE_ENV=production node dist/index.cjs",
     "check": "NODE_OPTIONS=--dns-result-order=ipv4first tsc",
+    "test": "NODE_OPTIONS=--dns-result-order=ipv4first node --import tsx --test tests/**/*.test.ts",
+    "test:integration": "NODE_OPTIONS=--dns-result-order=ipv4first node --import tsx --test tests/integration/**/*.integration.ts",
     "db:push": "NODE_OPTIONS=--dns-result-order=ipv4first drizzle-kit push --force"
   },
   "dependencies": {
@@ -58,6 +60,7 @@
     "lucide-react": "^0.453.0",
     "memorystore": "^1.6.7",
     "next-themes": "^0.4.6",
+    "nodemailer": "^7.0.13",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "pg": "^8.16.3",
@@ -87,6 +90,7 @@
     "@types/express": "^5.0.0",
     "@types/express-session": "^1.18.0",
     "@types/node": "20.19.27",
+    "@types/nodemailer": "^7.0.12",
     "@types/passport": "^1.0.16",
     "@types/passport-local": "^1.0.38",
     "@types/react": "^18.3.11",
