@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test, { after, before } from "node:test";
 import { spawn, type ChildProcess } from "node:child_process";
 import pg from "pg";
-import { hashToken } from "../../server/security";
 
 const port = 5099;
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -69,8 +68,7 @@ test("registration, login, staff approval, OTP transfer, and balances", async ()
 
   await request("/api/register", { ...registration, email: staffEmail, fullName: "Integration Staff", ssnLast4: "9999" });
   const staffId = (await pool.query(`SELECT id FROM users WHERE email=$1`, [staffEmail])).rows[0].id;
-  await pool.query(`UPDATE users SET status='active', email_verified=true, two_factor_enabled=false WHERE id=$1`, [staffId]);
-  await pool.query(`UPDATE users SET email_verified=true, two_factor_enabled=false WHERE id IN ($1,$2)`, [memberRow.id, recipientId]);
+  await pool.query(`UPDATE users SET status='active' WHERE id=$1`, [staffId]);
 
   const staffLogin = await request("/api/login", { username: staffEmail, password: registration.password });
   assert.equal(staffLogin.response.status, 200);
@@ -89,12 +87,13 @@ test("registration, login, staff approval, OTP transfer, and balances", async ()
   const recipientNumber = `2${String(suffix).slice(-9)}`;
   const toAccount = (await pool.query(`INSERT INTO accounts (user_id,account_number,type,balance,available_balance,status) VALUES ($1,$2,'checking','20.00','20.00','active') RETURNING id`, [recipientId, recipientNumber])).rows[0];
 
-  const challenge = "integration-transfer-challenge-token";
-  const code = "123456";
-  const transferHash = hashToken(`${fromAccount.id}|${recipientNumber}|25.00`);
-  await pool.query(`INSERT INTO security_tokens (user_id,type,token_hash,context,expires_at) VALUES ($1,'transfer_otp',$2,$3,NOW()+INTERVAL '10 minutes')`, [memberRow.id, hashToken(challenge), JSON.stringify({ otpHash: hashToken(code), transferHash })]);
-  const transfer = await request("/api/transactions/transfer", { fromAccountId: fromAccount.id, toAccountNumber: recipientNumber, amount: "25.00", narration: "Integration test", otpChallenge: challenge, otpCode: code }, memberLogin.cookie);
+  const idempotencyKey = "4a847df8-0ab5-41d7-9f4a-801e4993ecbe";
+  const transferBody = { fromAccountId: fromAccount.id, toAccountNumber: recipientNumber, amount: "25.00", narration: "Integration test", idempotencyKey };
+  const transfer = await request("/api/transactions/transfer", transferBody, memberLogin.cookie);
   assert.equal(transfer.response.status, 201);
+  const duplicate = await request("/api/transactions/transfer", transferBody, memberLogin.cookie);
+  assert.equal(duplicate.response.status, 201);
+  assert.equal(duplicate.data.id, transfer.data.id);
   const balances = await pool.query(`SELECT id,balance FROM accounts WHERE id IN ($1,$2) ORDER BY id`, [fromAccount.id, toAccount.id]);
   assert.deepEqual(balances.rows.map(row => Number(row.balance)), [75, 45]);
 });
