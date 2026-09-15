@@ -27,24 +27,8 @@ async function ensureSessionTable() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "user_sessions" ("expire");`);
   await pool.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "ssn_last4_encrypted" text;`);
-  await pool.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verified" boolean NOT NULL DEFAULT true;`);
-  await pool.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "two_factor_enabled" boolean NOT NULL DEFAULT true;`);
-  await pool.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "last_login_at" timestamp;`);
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS "security_tokens" (
-      "id" serial PRIMARY KEY,
-      "user_id" integer NOT NULL,
-      "type" text NOT NULL,
-      "token_hash" text NOT NULL UNIQUE,
-      "context" jsonb,
-      "attempts" integer NOT NULL DEFAULT 0,
-      "expires_at" timestamp NOT NULL,
-      "consumed_at" timestamp,
-      "created_at" timestamp DEFAULT NOW()
-    );
-  `);
-  await pool.query(`CREATE INDEX IF NOT EXISTS "security_tokens_token_hash_idx" ON "security_tokens" ("token_hash");`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS "security_tokens_user_idx" ON "security_tokens" ("user_id");`);
+  await pool.query(`ALTER TABLE "transactions" ADD COLUMN IF NOT EXISTS "idempotency_key" text;`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "transactions_idempotency_key_idx" ON "transactions" ("idempotency_key") WHERE "idempotency_key" IS NOT NULL;`);
 }
 
 export async function setupAuth(app: Express) {
@@ -52,10 +36,6 @@ export async function setupAuth(app: Express) {
   if (!sessionSecret) {
     throw new Error("SESSION_SECRET must be set");
   }
-  if (!process.env.DATA_ENCRYPTION_KEY) {
-    throw new Error("DATA_ENCRYPTION_KEY must be set");
-  }
-
   await ensureSessionTable();
   const legacySsnRows = await pool.query<{ id: number; ssn_last4: string }>(`SELECT "id", "ssn_last4" FROM "users" WHERE "ssn_last4" IS NOT NULL AND "ssn_last4_encrypted" IS NULL`);
   for (const row of legacySsnRows.rows) {
