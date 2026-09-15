@@ -8,7 +8,6 @@ import { Layout } from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { lazy, Suspense } from "react";
-import { ForgotPasswordPage, ResendVerificationPage, ResetPasswordPage, VerifyEmailPage } from "@/pages/SecurityAccessPage";
 
 const AuthPage = lazy(() => import("@/pages/AuthPage"));
 const CustomerDashboard = lazy(() => import("@/pages/CustomerDashboard"));
@@ -49,10 +48,6 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={AuthPage} />
-      <Route path="/forgot-password" component={ForgotPasswordPage} />
-      <Route path="/resend-verification" component={ResendVerificationPage} />
-      <Route path="/reset-password" component={ResetPasswordPage} />
-      <Route path="/verify-email" component={VerifyEmailPage} />
       
       <Route path="/dashboard">
         <ProtectedRoute component={CustomerDashboard} />
