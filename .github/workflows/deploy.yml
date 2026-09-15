@@ -1,0 +1,99 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: bank-master-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/bank-master.pem
+          chmod 600 ~/.ssh/bank-master.pem
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload runtime environment
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+        run: |
+          {
+            printf 'DATABASE_URL=%s\n' "$DATABASE_URL"
+            printf 'SESSION_SECRET=%s\n' "$SESSION_SECRET"
+            printf 'COOKIE_SECURE=true\n'
+            printf 'PORT=5000\n'
+          } | ssh -i ~/.ssh/bank-master.pem "$EC2_USER@$EC2_HOST"               'sudo sh -c "umask 077 && cat > /opt/bank-master.env"'
+
+      - name: Build and deploy
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          ssh -i ~/.ssh/bank-master.pem "$EC2_USER@$EC2_HOST"             "sudo bash -s -- '$RELEASE_SHA'" <<'REMOTE'
+          set -euo pipefail
+
+          RELEASE_SHA="$1"
+          REPOSITORY_DIR=/opt/bank-master
+          IMAGE="bank-master-app:$RELEASE_SHA"
+          NETWORK=livingworth-devops-website_livingworth
+          ENV_FILE=/opt/bank-master.env
+
+          test -d "$REPOSITORY_DIR/.git"
+          test -f "$ENV_FILE"
+          docker network inspect "$NETWORK" >/dev/null
+
+          git -C "$REPOSITORY_DIR" fetch origin main
+          git -C "$REPOSITORY_DIR" archive --format=tar origin/main |
+            docker build --pull -t "$IMAGE" -
+
+          docker rm -f bank-master-app-next >/dev/null 2>&1 || true
+
+          docker run -d             --name bank-master-app-next             --network "$NETWORK"             --restart unless-stopped             --env-file "$ENV_FILE"             "$IMAGE"
+
+          healthy=false
+          for attempt in $(seq 1 20); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' bank-master-app-next 2>/dev/null || true)
+            if [ "$status" = "healthy" ]; then
+              healthy=true
+              break
+            fi
+            if [ "$status" = "unhealthy" ]; then
+              docker logs --tail 100 bank-master-app-next
+              exit 1
+            fi
+            sleep 3
+          done
+
+          if [ "$healthy" != "true" ]; then
+            docker logs --tail 100 bank-master-app-next
+            exit 1
+          fi
+
+          docker rm -f bank-master-app >/dev/null 2>&1 || true
+          docker rename bank-master-app-next bank-master-app
+          docker exec livingworth-nginx nginx -t
+          docker exec livingworth-nginx nginx -s reload
+
+          curl --fail --silent --show-error --retry 5             --resolve redbirdfcu.com:443:127.0.0.1             https://redbirdfcu.com/health
+
+          docker image prune -f --filter "until=168h"
+          REMOTE
