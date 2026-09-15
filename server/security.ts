@@ -1,29 +1,9 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, timingSafeEqual } from "crypto";
-
-export type SecurityTokenType = "email_verification" | "password_reset" | "login_otp" | "transfer_otp";
-
-export function generateOpaqueToken(): string {
-  return randomBytes(32).toString("base64url");
-}
-
-export function generateOtp(): string {
-  return randomInt(0, 1_000_000).toString().padStart(6, "0");
-}
-
-export function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-export function tokenMatches(token: string, expectedHash: string): boolean {
-  const actual = Buffer.from(hashToken(token), "hex");
-  const expected = Buffer.from(expectedHash, "hex");
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
-}
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 
 function encryptionKey(): Buffer {
-  const raw = process.env.DATA_ENCRYPTION_KEY;
-  if (!raw) throw new Error("DATA_ENCRYPTION_KEY must be set");
-  return createHash("sha256").update(raw).digest();
+  const raw = process.env.DATA_ENCRYPTION_KEY || process.env.SESSION_SECRET;
+  if (!raw) throw new Error("SESSION_SECRET must be set");
+  return createHash("sha256").update(`redbird-sensitive-data:${raw}`).digest();
 }
 
 export function encryptSensitive(value: string): string {
