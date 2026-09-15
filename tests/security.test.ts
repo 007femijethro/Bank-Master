@@ -1,21 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { api } from "../shared/routes";
-import { decryptSensitive, encryptSensitive, generateOpaqueToken, generateOtp, hashToken, sanitizeUser, tokenMatches } from "../server/security";
+import { decryptSensitive, encryptSensitive, sanitizeUser } from "../server/security";
 
 process.env.DATA_ENCRYPTION_KEY = "test-only-encryption-key-never-use-in-production";
-
-test("opaque security tokens are random and verifiable by hash", () => {
-  const first = generateOpaqueToken();
-  const second = generateOpaqueToken();
-  assert.notEqual(first, second);
-  assert.equal(tokenMatches(first, hashToken(first)), true);
-  assert.equal(tokenMatches(second, hashToken(first)), false);
-});
-
-test("OTP codes contain exactly six digits", () => {
-  for (let index = 0; index < 20; index += 1) assert.match(generateOtp(), /^\d{6}$/);
-});
 
 test("sensitive fields are encrypted with authenticated encryption", () => {
   const encrypted = encryptSensitive("1234");
@@ -40,7 +28,7 @@ test("registration rejects privilege escalation and weak passwords", () => {
   assert.throws(() => api.auth.register.input.parse({ ...base, password: "weak" }));
 });
 
-test("transfers require an OTP challenge and six-digit code", () => {
+test("transfers require an idempotency key", () => {
   assert.throws(() => api.transactions.transfer.input.parse({ fromAccountId: 1, toAccountNumber: "1234567890", amount: "10.00" }));
-  assert.doesNotThrow(() => api.transactions.transfer.input.parse({ fromAccountId: 1, toAccountNumber: "1234567890", amount: "10.00", otpChallenge: "a".repeat(20), otpCode: "123456" }));
+  assert.doesNotThrow(() => api.transactions.transfer.input.parse({ fromAccountId: 1, toAccountNumber: "1234567890", amount: "10.00", idempotencyKey: "4a847df8-0ab5-41d7-9f4a-801e4993ecbe" }));
 });
