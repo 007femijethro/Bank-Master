@@ -25,26 +25,8 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   kycStatus: text("kyc_status", { enum: ["pending", "verified", "rejected"] }).default("pending").notNull(),
   kycVerifiedAt: timestamp("kyc_verified_at"),
-  emailVerified: boolean("email_verified").default(true).notNull(),
-  twoFactorEnabled: boolean("two_factor_enabled").default(true).notNull(),
-  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
-
-export const securityTokens = pgTable("security_tokens", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  type: text("type", { enum: ["email_verification", "password_reset", "login_otp", "transfer_otp"] }).notNull(),
-  tokenHash: text("token_hash").notNull().unique(),
-  context: jsonb("context").$type<Record<string, unknown>>(),
-  attempts: integer("attempts").default(0).notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
-  consumedAt: timestamp("consumed_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => ({
-  tokenHashIdx: index("security_tokens_token_hash_idx").on(table.tokenHash),
-  userIdx: index("security_tokens_user_idx").on(table.userId),
-}));
 
 export const accountApplications = pgTable("account_applications", {
   id: serial("id").primaryKey(),
@@ -74,6 +56,7 @@ export const accounts = pgTable("accounts", {
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   reference: text("reference").notNull().unique(),
+  idempotencyKey: text("idempotency_key").unique(),
   type: text("type", { enum: ["deposit", "transfer", "billpay", "adjustment_credit", "adjustment_debit", "mobile_deposit", "credit_card_purchase", "credit_card_payment", "fee_assessment", "fee_reversal"] }).notNull(),
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
   fromAccountId: integer("from_account_id"),
@@ -303,7 +286,7 @@ const strongPasswordSchema = z.string()
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true, createdAt: true, memberNumber: true, role: true, status: true,
   dashboardWidgets: true, avatarUrl: true, kycStatus: true, kycVerifiedAt: true,
-  emailVerified: true, twoFactorEnabled: true, lastLoginAt: true, ssnLast4Encrypted: true,
+  ssnLast4Encrypted: true,
 }).extend({
   password: strongPasswordSchema,
   dashboardWidgets: z.array(z.string()).optional(),
