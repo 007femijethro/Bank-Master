@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useAccounts, useTransactions, useDeposit, useTransfer, useBillPay, useAccountLookup } from "@/hooks/use-accounts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CurrencyInput } from "@/components/CurrencyInput";
-import { AlertCircle, ArrowRight, Loader2, CheckCircle2 } from "lucide-react";
+import { AlertCircle, ArrowRight, Loader2, CheckCircle2, Printer, Search, Star, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useBeneficiaries } from "@/hooks/use-product";
 
 export default function TransactionPage() {
   const { user } = useAuth();
@@ -20,6 +22,7 @@ export default function TransactionPage() {
   const deposit = useDeposit();
   const transfer = useTransfer();
   const billPay = useBillPay();
+  const beneficiaries = useBeneficiaries();
   const { toast } = useToast();
 
   const [selectedAccount, setSelectedAccount] = useState<string>("");
@@ -27,6 +30,11 @@ export default function TransactionPage() {
   const [amount, setAmount] = useState("");
   const [narration, setNarration] = useState("");
   const [billerType, setBillerType] = useState("");
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [receipt, setReceipt] = useState<any>(null);
+  const [beneficiaryNickname, setBeneficiaryNickname] = useState("");
+  const [transactionSearch, setTransactionSearch] = useState("");
+  const [transactionType, setTransactionType] = useState("all");
   
   // Lookup recipient name
   const { data: recipientInfo, isFetching: isLookingUp } = useAccountLookup(recipientAccount);
@@ -53,8 +61,18 @@ export default function TransactionPage() {
     });
   };
 
+  const filteredTransactions = useMemo(() => (transactions || []).filter((tx) => {
+    const matchesType = transactionType === "all" || tx.type === transactionType;
+    const haystack = `${tx.type} ${tx.narration || ""} ${tx.reference}`.toLowerCase();
+    return matchesType && haystack.includes(transactionSearch.toLowerCase());
+  }), [transactions, transactionSearch, transactionType]);
+
   const handleTransfer = () => {
-    if (!selectedAccount || !recipientAccount || !amount) return;
+    if (!selectedAccount || !recipientAccount || !amount || !recipientInfo) return;
+    setConfirmationOpen(true);
+  };
+
+  const submitTransfer = () => {
     transfer.mutate({
       fromAccountId: Number(selectedAccount),
       toAccountNumber: recipientAccount,
@@ -62,11 +80,24 @@ export default function TransactionPage() {
       narration: narration || "Transfer",
       idempotencyKey: crypto.randomUUID(),
     }, {
-      onSuccess: () => {
+      onSuccess: (transaction) => {
+        setConfirmationOpen(false);
+        setReceipt(transaction);
         toast({ title: "Transfer Successful", description: `$${amount} sent to ${recipientInfo?.fullName || recipientAccount}.` });
         resetForm();
       },
       onError: (e) => toast({ variant: "destructive", title: "Transfer Failed", description: e.message })
+    });
+  };
+
+  const saveBeneficiary = () => {
+    if (!beneficiaryNickname.trim() || !recipientAccount || !recipientInfo) return;
+    beneficiaries.create.mutate({ nickname: beneficiaryNickname.trim(), accountNumber: recipientAccount }, {
+      onSuccess: () => {
+        setBeneficiaryNickname("");
+        toast({ title: "Beneficiary saved", description: `${recipientInfo.fullName} is now in your saved recipients.` });
+      },
+      onError: (e) => toast({ variant: "destructive", title: "Could not save beneficiary", description: e.message }),
     });
   };
 
@@ -164,9 +195,24 @@ export default function TransactionPage() {
           <Card>
             <CardHeader>
               <CardTitle>Transfer Money</CardTitle>
-              <CardDescription>Send money to another SecureBank user.</CardDescription>
+              <CardDescription>Send money securely to another Redbird FCU member.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-w-md">
+              {beneficiaries.data?.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Saved recipient</Label>
+                  <Select value={beneficiaries.data.some((b: any) => b.accountNumber === recipientAccount) ? recipientAccount : ""} onValueChange={setRecipientAccount}>
+                    <SelectTrigger><SelectValue placeholder="Choose a beneficiary" /></SelectTrigger>
+                    <SelectContent>
+                      {beneficiaries.data.map((beneficiary: any) => (
+                        <SelectItem key={beneficiary.id} value={beneficiary.accountNumber}>
+                          {beneficiary.nickname} · ••••{beneficiary.accountNumber.slice(-4)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>From Account</Label>
                 <Select value={selectedAccount} onValueChange={setSelectedAccount}>
@@ -202,6 +248,30 @@ export default function TransactionPage() {
                 </div>
               </div>
 
+              {recipientInfo && !beneficiaries.data?.some((b: any) => b.accountNumber === recipientAccount) && (
+                <div className="flex gap-2 rounded-lg border bg-muted/30 p-3">
+                  <Input
+                    value={beneficiaryNickname}
+                    onChange={(e) => setBeneficiaryNickname(e.target.value)}
+                    placeholder="Nickname, e.g. Mum"
+                  />
+                  <Button variant="outline" onClick={saveBeneficiary} disabled={!beneficiaryNickname.trim() || beneficiaries.create.isPending}>
+                    <Star className="mr-2 h-4 w-4" /> Save
+                  </Button>
+                </div>
+              )}
+
+              {beneficiaries.data?.some((b: any) => b.accountNumber === recipientAccount) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  onClick={() => beneficiaries.remove.mutate(beneficiaries.data.find((b: any) => b.accountNumber === recipientAccount).id)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Remove saved recipient
+                </Button>
+              )}
+
               <CurrencyInput
                 label="Amount"
                 value={amount}
@@ -217,7 +287,7 @@ export default function TransactionPage() {
               <Button 
                 className="w-full" 
                 onClick={handleTransfer} 
-                disabled={!selectedAccount || !recipientAccount || !amount || transfer.isPending}
+                disabled={!selectedAccount || !recipientAccount || !amount || !recipientInfo || transfer.isPending}
               >
                 {transfer.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRight className="w-4 h-4 mr-2" />}
                 Send Money
@@ -300,10 +370,28 @@ export default function TransactionPage() {
           <Card>
             <CardHeader>
               <CardTitle>Transaction History</CardTitle>
+              <CardDescription>Search by description or reference and filter by transaction type.</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_220px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input className="pl-9" value={transactionSearch} onChange={(e) => setTransactionSearch(e.target.value)} placeholder="Search transactions" />
+                </div>
+                <Select value={transactionType} onValueChange={setTransactionType}>
+                  <SelectTrigger><SelectValue placeholder="All types" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All types</SelectItem>
+                    <SelectItem value="transfer">Transfers</SelectItem>
+                    <SelectItem value="deposit">Deposits</SelectItem>
+                    <SelectItem value="bill_payment">Bill payments</SelectItem>
+                    <SelectItem value="adjustment_credit">Credits</SelectItem>
+                    <SelectItem value="adjustment_debit">Debits</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {transactions && transactions.length > 0 ? (
-                <div className="rounded-md border">
+                <div className="overflow-x-auto rounded-md border">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">
@@ -315,7 +403,7 @@ export default function TransactionPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {transactions.map((tx) => (
+                      {filteredTransactions.map((tx) => (
                         <tr key={tx.id} className="border-b last:border-0 hover:bg-muted/30">
                           <td className="p-3">
                             {format(new Date(tx.createdAt || new Date()), "MMM d, yyyy")}
@@ -332,7 +420,7 @@ export default function TransactionPage() {
                           </td>
                           <td className="p-3 text-center">
                             <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                              tx.status === 'success' ? 'bg-green-50 text-green-700' : 
+                              tx.status === 'success' || tx.status === 'posted' ? 'bg-green-50 text-green-700' :
                               tx.status === 'failed' ? 'bg-red-50 text-red-700' : 
                               'bg-yellow-50 text-yellow-700'
                             }`}>
@@ -343,6 +431,7 @@ export default function TransactionPage() {
                       ))}
                     </tbody>
                   </table>
+                  {filteredTransactions.length === 0 && <div className="p-8 text-center text-sm text-muted-foreground">No transactions match your filters.</div>}
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
@@ -353,6 +442,46 @@ export default function TransactionPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={confirmationOpen} onOpenChange={setConfirmationOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm transfer</DialogTitle>
+            <DialogDescription>Review these details carefully before sending. Transfers cannot be reversed automatically.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 rounded-lg bg-muted/40 p-4 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Recipient</span><span className="font-medium">{recipientInfo?.fullName}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Account</span><span className="font-mono">••••{recipientAccount.slice(-4)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Amount</span><span className="text-lg font-bold">${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Narration</span><span>{narration || "Transfer"}</span></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmationOpen(false)}>Go back</Button>
+            <Button onClick={submitTransfer} disabled={transfer.isPending}>
+              {transfer.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Confirm and send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!receipt} onOpenChange={(open) => !open && setReceipt(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-green-600" /> Transfer receipt</DialogTitle>
+            <DialogDescription>Your transfer was completed successfully.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 rounded-lg border p-4 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Reference</span><span className="font-mono text-xs">{receipt?.reference}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Amount</span><span className="text-lg font-bold">${Number(receipt?.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="font-medium capitalize text-green-700">{receipt?.status}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Date</span><span>{receipt?.createdAt ? format(new Date(receipt.createdAt), "MMM d, yyyy h:mm a") : "Just now"}</span></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Print receipt</Button>
+            <Button onClick={() => setReceipt(null)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
