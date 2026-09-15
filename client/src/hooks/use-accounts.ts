@@ -122,19 +122,6 @@ export function useTransfer() {
   });
 }
 
-export function useRequestTransferOtp() {
-  return useMutation({
-    mutationFn: async (data: z.infer<typeof api.transactions.requestTransferOtp.input>) => {
-      const res = await fetch(api.transactions.requestTransferOtp.path, {
-        method: api.transactions.requestTransferOtp.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      return handleResponse(res, api.transactions.requestTransferOtp.responses[200]);
-    },
-  });
-}
-
 export function useBillPay() {
   const queryClient = useQueryClient();
   return useMutation({
