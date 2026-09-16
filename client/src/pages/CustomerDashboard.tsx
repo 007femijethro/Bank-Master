@@ -129,7 +129,7 @@ export default function CustomerDashboard() {
   if (isLoading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       {user?.status === 'frozen' && (
         <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800">
           <AlertCircle className="h-4 w-4" />
@@ -139,16 +139,16 @@ export default function CustomerDashboard() {
       )}
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex items-center gap-4">
-          <Avatar className="w-12 h-12 border-2 border-primary/10">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <Avatar className="w-10 h-10 shrink-0 border-2 border-primary/10 sm:h-12 sm:w-12">
             <AvatarImage src={user?.avatarUrl || ""} alt={user?.fullName} />
             <AvatarFallback className="bg-primary/10 text-primary font-bold">
               {user?.fullName?.charAt(0)}
             </AvatarFallback>
           </Avatar>
-          <div>
-            <h2 className="text-3xl font-display font-bold text-foreground">Redbird FCU Dashboard</h2>
-            <p className="text-muted-foreground">Member: {user?.fullName} | Member #: {user?.memberNumber}</p>
+          <div className="min-w-0">
+            <h2 className="text-xl font-display font-bold text-foreground sm:text-3xl">Redbird FCU Dashboard</h2>
+            <p className="truncate text-sm text-muted-foreground sm:text-base">Member: {user?.fullName} <span className="hidden sm:inline">| Member #: {user?.memberNumber}</span></p>
           </div>
         </div>
         
@@ -229,7 +229,7 @@ export default function CustomerDashboard() {
               <DialogDescription>Apply for a new account, loan, or credit line. Applications are reviewed by staff.</DialogDescription>
             </DialogHeader>
             <div className="py-4">
-              <RadioGroup value={accountType} onValueChange={(v) => setAccountType(v as any)} className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <RadioGroup value={accountType} onValueChange={(v) => setAccountType(v as any)} className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 sm:gap-4">
                 <div>
                   <RadioGroupItem value="share_savings" id="share_savings" className="peer sr-only" />
                   <Label htmlFor="share_savings" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent peer-data-[state=checked]:border-primary cursor-pointer">
@@ -308,8 +308,8 @@ export default function CustomerDashboard() {
             </Link>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-6 flex-wrap">
-              <div className={`relative w-64 aspect-[1.586/1] bg-gradient-to-br ${primaryCreditCard.cardType === 'rewards' ? 'from-violet-600 to-indigo-700' : primaryCreditCard.cardType === 'travel' ? 'from-blue-600 to-cyan-700' : primaryCreditCard.cardType === 'low_interest' ? 'from-emerald-600 to-teal-700' : primaryCreditCard.cardType === 'secured' ? 'from-slate-600 to-zinc-700' : 'from-orange-500 to-amber-600'} rounded-xl p-4 text-white shadow-md`}>
+              <div className="flex items-center gap-6 flex-wrap">
+              <div className={`relative w-full max-w-64 aspect-[1.586/1] bg-gradient-to-br ${primaryCreditCard.cardType === 'rewards' ? 'from-violet-600 to-indigo-700' : primaryCreditCard.cardType === 'travel' ? 'from-blue-600 to-cyan-700' : primaryCreditCard.cardType === 'low_interest' ? 'from-emerald-600 to-teal-700' : primaryCreditCard.cardType === 'secured' ? 'from-slate-600 to-zinc-700' : 'from-orange-500 to-amber-600'} rounded-xl p-4 text-white shadow-md`}>
                 <div className="flex justify-between items-start">
                   <p className="text-[10px] uppercase tracking-widest opacity-80">REDBIRD FCU</p>
                   <CreditCard className="w-5 h-5 opacity-60" />
