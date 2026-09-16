@@ -344,7 +344,7 @@ export default function ApplyPage() {
       </div>
 
       <Tabs defaultValue="loan" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid h-auto w-full grid-cols-1 gap-1 p-1 sm:grid-cols-3">
           <TabsTrigger value="loan" data-testid="tab-loan" className="gap-2"><Wallet className="w-4 h-4" /> Personal Loan</TabsTrigger>
           <TabsTrigger value="home_equity" data-testid="tab-equity" className="gap-2"><Home className="w-4 h-4" /> Home Equity</TabsTrigger>
           <TabsTrigger value="credit_card" data-testid="tab-cc" className="gap-2"><CreditCard className="w-4 h-4" /> Credit Card</TabsTrigger>

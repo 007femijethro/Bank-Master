@@ -373,25 +373,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile Sidebar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-border p-4 flex items-center justify-between">
-        <h1 className="text-xl font-display font-bold text-primary flex items-center gap-2">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-b border-border px-4 py-3 flex items-center justify-between safe-area-top">
+        <h1 className="text-lg sm:text-xl font-display font-bold text-primary flex items-center gap-2">
           <ShieldCheck className="w-6 h-6" />
           Redbird FCU
         </h1>
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Open navigation menu">
               <Menu className="w-6 h-6" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-72">
+          <SheetContent side="left" className="p-0 w-[min(20rem,88vw)]">
             <NavContent />
           </SheetContent>
         </Sheet>
       </div>
 
-      <main className="flex-1 lg:ml-72 pt-20 lg:pt-0 p-4 md:p-8 min-h-screen">
-        <div className="max-w-6xl mx-auto">
+      <main className="min-w-0 flex-1 lg:ml-72 pt-20 lg:pt-8 px-3 pb-8 sm:px-4 md:px-8 min-h-screen overflow-x-hidden">
+        <div className="max-w-6xl mx-auto min-w-0">
           {children}
         </div>
       </main>

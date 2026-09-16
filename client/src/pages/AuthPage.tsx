@@ -150,7 +150,7 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 lg:p-8 flex items-center">
-      <div className="w-full max-w-6xl mx-auto grid lg:grid-cols-[1.05fr_0.95fr] bg-white dark:bg-background rounded-3xl overflow-hidden shadow-2xl">
+      <div className="w-full max-w-6xl mx-auto grid lg:grid-cols-[1.05fr_0.95fr] bg-white dark:bg-background rounded-none sm:rounded-3xl overflow-hidden shadow-xl sm:shadow-2xl">
         <section className="hidden lg:flex flex-col justify-between p-12 text-white bg-gradient-to-br from-blue-700 via-blue-800 to-slate-950 relative overflow-hidden">
           <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10" />
           <div className="relative">
@@ -171,7 +171,7 @@ export default function AuthPage() {
           </div>
         </section>
 
-        <div className="p-6 sm:p-10 lg:p-12 grid gap-8 content-center max-h-screen overflow-y-auto">
+        <div className="min-h-[100dvh] p-4 sm:min-h-0 sm:p-10 lg:p-12 grid gap-6 sm:gap-8 content-center overflow-y-auto">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2 text-primary mb-4">
             <ShieldCheck className="w-12 h-12" />
@@ -268,7 +268,7 @@ export default function AuthPage() {
                 ) : (
                   <Form {...registerForm}>
                     <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <FormField
                           control={registerForm.control}
                           name="firstName"
@@ -311,7 +311,7 @@ export default function AuthPage() {
                         )}
                       />
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <FormField
                           control={registerForm.control}
                           name="phone"
@@ -379,7 +379,7 @@ export default function AuthPage() {
                         )}
                       />
 
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <FormField
                           control={registerForm.control}
                           name="city"
