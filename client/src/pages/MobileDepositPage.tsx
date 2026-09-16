@@ -98,7 +98,7 @@ export default function MobileDepositPage() {
         <p className="text-muted-foreground">Deposit checks by capturing front and back images. Deposits are reviewed by staff.</p>
       </div>
 
-      <div className="grid gap-8 md:grid-cols-2">
+      <div className="grid gap-5 sm:gap-8 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Upload className="w-5 h-5" /> New Check Deposit</CardTitle>
@@ -124,7 +124,7 @@ export default function MobileDepositPage() {
               <Input data-testid="input-deposit-amount" type="number" step="0.01" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Check Front</Label>
                 <button
