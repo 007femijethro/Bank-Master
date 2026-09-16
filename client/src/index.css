@@ -77,10 +77,25 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body antialiased;
+    @apply bg-background text-foreground font-body antialiased overflow-x-hidden;
+    min-width: 320px;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-display tracking-tight font-bold;
+  }
+}
+
+@media (max-width: 640px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  button, [role="button"] {
+    touch-action: manipulation;
+  }
+
+  table {
+    min-width: 680px;
   }
 }
 
