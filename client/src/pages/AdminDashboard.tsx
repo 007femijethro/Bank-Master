@@ -164,9 +164,9 @@ export default function AdminDashboard() {
   const defaultTab = location === "/admin/logs" ? "logs" : "users";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div>
-        <h2 className="text-3xl font-display font-bold text-foreground">Staff Portal</h2>
+        <h2 className="text-2xl sm:text-3xl font-display font-bold text-foreground">Staff Portal</h2>
         <p className="text-muted-foreground">Manage members, applications, mobile deposits, and account adjustments</p>
       </div>
 
