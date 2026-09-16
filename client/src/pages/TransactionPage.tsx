@@ -133,14 +133,14 @@ export default function TransactionPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <div>
-        <h2 className="text-3xl font-display font-bold">Transactions</h2>
+        <h2 className="text-2xl sm:text-3xl font-display font-bold">Transactions</h2>
         <p className="text-muted-foreground">Manage your money securely</p>
       </div>
 
       <Tabs defaultValue="transfer" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 sm:grid-cols-4 lg:w-[600px]">
           <TabsTrigger value="deposit">Deposit</TabsTrigger>
           <TabsTrigger value="transfer">Transfer</TabsTrigger>
           <TabsTrigger value="bills">Bill Pay</TabsTrigger>
@@ -153,7 +153,7 @@ export default function TransactionPage() {
               <CardTitle>Deposit Funds</CardTitle>
               <CardDescription>Deposits are submitted for admin review and will post after approval.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 max-w-md">
+            <CardContent className="space-y-4 max-w-md px-4 sm:px-6">
               <div className="space-y-2">
                 <Label>Select Account</Label>
                 <Select value={selectedAccount} onValueChange={setSelectedAccount}>
@@ -197,7 +197,7 @@ export default function TransactionPage() {
               <CardTitle>Transfer Money</CardTitle>
               <CardDescription>Send money securely to another Redbird FCU member.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 max-w-md">
+            <CardContent className="space-y-4 max-w-md px-4 sm:px-6">
               {beneficiaries.data?.length > 0 && (
                 <div className="space-y-2">
                   <Label>Saved recipient</Label>
@@ -239,17 +239,17 @@ export default function TransactionPage() {
                     maxLength={10}
                   />
                   {isLookingUp && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
-                  {recipientInfo && (
-                    <div className="absolute right-3 top-2.5 flex items-center text-green-600 text-xs font-bold bg-green-50 px-2 py-0.5 rounded-full">
-                      <CheckCircle2 className="w-3 h-3 mr-1" />
-                      {recipientInfo.fullName}
-                    </div>
-                  )}
                 </div>
+                {recipientInfo && (
+                  <div className="mt-2 flex items-center text-green-700 text-xs font-semibold bg-green-50 px-2 py-1.5 rounded-md">
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5 shrink-0" />
+                    <span className="truncate">{recipientInfo.fullName}</span>
+                  </div>
+                )}
               </div>
 
               {recipientInfo && !beneficiaries.data?.some((b: any) => b.accountNumber === recipientAccount) && (
-                <div className="flex gap-2 rounded-lg border bg-muted/30 p-3">
+                <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3 sm:flex-row">
                   <Input
                     value={beneficiaryNickname}
                     onChange={(e) => setBeneficiaryNickname(e.target.value)}
@@ -302,7 +302,7 @@ export default function TransactionPage() {
               <CardTitle>Pay Bills</CardTitle>
               <CardDescription>Bill payments are submitted for admin review before posting.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 max-w-md">
+            <CardContent className="space-y-4 max-w-md px-4 sm:px-6">
               <div className="space-y-2">
                 <Label>From Account</Label>
                 <Select value={selectedAccount} onValueChange={setSelectedAccount}>
