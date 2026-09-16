@@ -52,7 +52,7 @@ function CreditCardVisual({ card, showDetails, onToggle }: { card: any; showDeta
   const gradient = CARD_TYPE_COLORS[card.cardType] || "from-gray-600 to-gray-800";
 
   return (
-    <div className={`relative w-full max-w-md aspect-[1.586/1] bg-gradient-to-br ${gradient} rounded-xl p-6 text-white shadow-lg`} data-testid={`card-visual-${card.id}`}>
+    <div className={`relative w-full max-w-md aspect-[1.586/1] bg-gradient-to-br ${gradient} rounded-xl p-4 sm:p-6 text-white shadow-lg`} data-testid={`card-visual-${card.id}`}>
       <div className="flex justify-between items-start">
         <div>
           <p className="text-xs uppercase tracking-widest opacity-80">REDBIRD FCU</p>
@@ -256,7 +256,7 @@ export default function CreditCardsPage() {
 
                 <Card>
                   <CardContent className="pt-6">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
                         <p className="text-xs text-muted-foreground uppercase">Credit Limit</p>
                         <p className="text-lg font-bold" data-testid="text-credit-limit">${Number(activeCard.creditLimit).toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
@@ -450,7 +450,7 @@ export default function CreditCardsPage() {
           <CardDescription>Important information about your Redbird FCU credit cards.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div className="p-4 bg-muted/50 rounded-lg">
               <p className="font-semibold mb-1">Billing Cycle</p>
               <p className="text-muted-foreground">Monthly, 1st of each month</p>
