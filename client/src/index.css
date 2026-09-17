@@ -1,87 +1,112 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --font-display: 'Outfit', sans-serif;
-  --font-body: 'Plus Jakarta Sans', sans-serif;
+  --font-display: 'Merriweather', Georgia, serif;
+  --font-body: 'Inter', Arial, sans-serif;
 
-  /* Elegant Blue Banking Theme */
-  --background: 210 40% 98%;
-  --foreground: 222 47% 11%;
+  /* Conventional US credit-union palette */
+  --background: 210 30% 97%;
+  --foreground: 216 34% 16%;
 
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  
+  --card-foreground: 216 34% 16%;
+
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
+  --popover-foreground: 216 34% 16%;
 
-  /* Trustworthy Blue */
-  --primary: 221 83% 53%;
-  --primary-foreground: 210 40% 98%;
+  /* Deep institutional navy / royal blue */
+  --primary: 215 77% 35%;
+  --primary-foreground: 0 0% 100%;
 
-  /* Slate Accents */
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222 47% 11.2%;
+  --secondary: 211 24% 94%;
+  --secondary-foreground: 216 34% 18%;
 
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215 16% 47%;
+  --muted: 210 24% 95%;
+  --muted-foreground: 215 14% 42%;
 
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222 47% 11.2%;
+  --accent: 211 30% 92%;
+  --accent-foreground: 215 77% 30%;
 
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive: 0 69% 45%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 221.2 83.2% 53.3%;
-  
-  --radius: 0.75rem;
+  --border: 214 22% 86%;
+  --input: 214 22% 82%;
+  --ring: 215 77% 35%;
+
+  --radius: 0.5rem;
 }
 
 .dark {
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
-
-  --card: 222 47% 11%;
-  --card-foreground: 210 40% 98%;
-
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 40% 98%;
-
-  --primary: 217 91% 60%;
-  --primary-foreground: 222 47% 11%;
-
-  --secondary: 217 32% 17%;
-  --secondary-foreground: 210 40% 98%;
-
-  --muted: 217 32% 17%;
-  --muted-foreground: 215 20% 65%;
-
-  --accent: 217 32% 17%;
-  --accent-foreground: 210 40% 98%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-
-  --border: 217 32% 17%;
-  --input: 217 32% 17%;
-  --ring: 224 76% 48%;
+  --background: 216 37% 10%;
+  --foreground: 210 25% 96%;
+  --card: 216 31% 13%;
+  --card-foreground: 210 25% 96%;
+  --popover: 216 31% 13%;
+  --popover-foreground: 210 25% 96%;
+  --primary: 213 88% 64%;
+  --primary-foreground: 216 37% 10%;
+  --secondary: 216 24% 18%;
+  --secondary-foreground: 210 25% 96%;
+  --muted: 216 24% 18%;
+  --muted-foreground: 215 16% 66%;
+  --accent: 216 24% 20%;
+  --accent-foreground: 210 25% 96%;
+  --destructive: 0 62% 38%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 216 22% 23%;
+  --input: 216 22% 23%;
+  --ring: 213 88% 64%;
 }
 
 @layer base {
   * {
     @apply border-border;
   }
+
+  html {
+    background: hsl(var(--background));
+  }
+
   body {
     @apply bg-background text-foreground font-body antialiased overflow-x-hidden;
     min-width: 320px;
+    letter-spacing: -0.01em;
   }
+
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display tracking-tight font-bold;
+    @apply tracking-tight;
+    font-family: var(--font-display);
+  }
+
+  input, select, textarea {
+    @apply bg-white dark:bg-card;
+  }
+}
+
+@layer components {
+  /* More restrained financial-institution surface treatment */
+  .shadcn-card {
+    border-color: hsl(var(--border));
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 18px rgba(15, 23, 42, 0.035);
+  }
+
+  .shadcn-card:hover {
+    border-color: hsl(214 24% 80%);
+  }
+
+  /* Softer focus treatment used by many banking portals */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 }
 
@@ -101,14 +126,27 @@
 
 @layer utilities {
   .glass-card {
-    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl dark:bg-black/40;
+    @apply bg-white border shadow-sm dark:bg-card;
+    backdrop-filter: none;
   }
-  
+
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600;
+    @apply text-primary;
+    background: none;
+    -webkit-text-fill-color: currentColor;
   }
 
   .text-gradient-gold {
-     @apply bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-yellow-600;
+    @apply text-amber-700 dark:text-amber-400;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+
+  .bank-section-label {
+    @apply text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  }
+
+  .bank-muted-panel {
+    @apply rounded-md border bg-muted/40;
   }
 }
