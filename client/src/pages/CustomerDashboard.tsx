@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useAccounts, useTransactions } from "@/hooks/use-accounts";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -10,6 +10,7 @@ import {
   ArrowUpRight,
   Bell,
   ChevronRight,
+  Coins,
   Eye,
   EyeOff,
   FileText,
@@ -23,7 +24,19 @@ import {
 import { useState } from "react";
 import { format } from "date-fns";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useNotifications } from "@/hooks/use-product";
+
+const CRYPTO_PRICES: Record<string, number> = {
+  BTC: 97284.5,
+  ETH: 3642.8,
+  SOL: 178.45,
+  ADA: 0.87,
+  DOT: 8.92,
+  LINK: 22.15,
+  XRP: 2.34,
+  DOGE: 0.32,
+};
 
 const money = (value: string | number) =>
   Number(value).toLocaleString("en-US", {
@@ -45,6 +58,27 @@ export default function CustomerDashboard() {
   const notifications = useNotifications();
   const [showBalances, setShowBalances] = useState(true);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  const { data: cryptoHoldings = [] } = useQuery({
+    queryKey: ["/api/crypto/holdings"],
+    queryFn: async () => {
+      const response = await fetch("/api/crypto/holdings");
+      if (!response.ok) return [];
+      return response.json();
+    },
+  });
+
+  const activeCryptoHoldings = cryptoHoldings.filter((holding: any) => Number(holding.amount) > 0);
+  const cryptoTotalValue = activeCryptoHoldings.reduce((sum: number, holding: any) => {
+    const price = CRYPTO_PRICES[String(holding.symbol || "").toUpperCase()] || 0;
+    return sum + Number(holding.amount) * price;
+  }, 0);
+
+  const cryptoSymbols = activeCryptoHoldings
+    .map((holding: any) => String(holding.symbol || "").toUpperCase())
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(" · ");
 
   const unreadNotifications = (notifications.data || []).filter((item: any) => !item.read).length;
   const recentTransactions = transactions?.slice(0, 8) || [];
@@ -87,9 +121,7 @@ export default function CustomerDashboard() {
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-primary">Online banking</p>
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Welcome back, {firstName}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Member #{user?.memberNumber || "—"}
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Member #{user?.memberNumber || "—"}</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -144,7 +176,12 @@ export default function CustomerDashboard() {
               </DialogContent>
             </Dialog>
 
-            <Button variant="outline" size="icon" onClick={() => setShowBalances((value) => !value)} aria-label="Toggle balances">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowBalances((value) => !value)}
+              aria-label="Toggle balances"
+            >
               {showBalances ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
 
@@ -155,7 +192,6 @@ export default function CustomerDashboard() {
         </div>
       </section>
 
-      {/* Desktop quick actions. Hidden on mobile by request. */}
       <section className="hidden grid-cols-4 gap-3 sm:grid">
         <Link href="/transactions">
           <Button variant="outline" className="h-12 w-full justify-start bg-white">
@@ -182,20 +218,20 @@ export default function CustomerDashboard() {
       <section>
         <div className="mb-3 flex items-end justify-between">
           <div>
-            <h2 className="text-lg font-semibold sm:text-xl">Accounts</h2>
-            <p className="text-sm text-muted-foreground">Your Redbird FCU deposit accounts</p>
+            <h2 className="text-lg font-semibold sm:text-xl">Accounts & investments</h2>
+            <p className="text-sm text-muted-foreground">Deposit accounts and portfolio balances</p>
           </div>
           <div className="hidden text-right sm:block">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Total available</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Deposit funds available</p>
             <p className="text-lg font-semibold">{showBalances ? money(totalAvailable) : "••••••"}</p>
           </div>
         </div>
 
         <Card className="overflow-hidden">
           <CardContent className="p-0">
-            {accounts?.length ? (
-              <div className="divide-y">
-                {accounts.map((account) => (
+            <div className="divide-y">
+              {accounts?.length ? (
+                accounts.map((account) => (
                   <div key={account.id} className="p-4 sm:p-5">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex min-w-0 items-start gap-3">
@@ -222,18 +258,42 @@ export default function CustomerDashboard() {
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-8 text-center">
-                <ShieldCheck className="mx-auto mb-3 h-8 w-8 text-primary" />
-                <p className="font-medium">No active accounts</p>
-                <p className="mt-1 text-sm text-muted-foreground">Apply for an account to get started.</p>
-                <Link href="/apply">
-                  <Button className="mt-4">Apply now</Button>
-                </Link>
-              </div>
-            )}
+                ))
+              ) : (
+                <div className="p-5 text-sm text-muted-foreground">No active deposit accounts.</div>
+              )}
+
+              <Link href="/crypto">
+                <div className="cursor-pointer p-4 transition-colors hover:bg-muted/30 sm:p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+                        <Coins className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold">Crypto Portfolio</p>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {activeCryptoHoldings.length
+                            ? `${activeCryptoHoldings.length} asset${activeCryptoHoldings.length === 1 ? "" : "s"}${cryptoSymbols ? ` · ${cryptoSymbols}` : ""}`
+                            : "No active holdings"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Estimated value</p>
+                      <p className="mt-0.5 text-xl font-semibold tracking-tight sm:text-2xl">
+                        {showBalances ? money(cryptoTotalValue) : "••••••"}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">View portfolio</p>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </section>
@@ -294,7 +354,7 @@ export default function CustomerDashboard() {
       </section>
 
       <footer className="border-t py-6 text-center text-xs leading-5 text-muted-foreground">
-        Redbird FCU demo online banking · Interface simulation only · Not a real financial institution
+        © 2026 Redbird FCU · Training & demonstration environment
       </footer>
     </div>
   );
