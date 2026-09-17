@@ -11,23 +11,28 @@ interface StatCardProps {
 
 export function StatCard({ title, value, icon: Icon, description, className }: StatCardProps) {
   const hasFg = className?.includes("text-primary-foreground");
+
   return (
-    <Card className={`overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border-border/50 ${className}`}>
-      <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-        <CardTitle className={`text-sm font-medium ${hasFg ? "text-white/80" : "text-muted-foreground"}`}>
-          {title}
-        </CardTitle>
-        <div className={`h-8 w-8 rounded-full flex items-center justify-center ${hasFg ? "bg-white/20" : "bg-primary/10"}`}>
+    <Card className={`overflow-hidden border transition-colors duration-200 ${className || ""}`}>
+      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
+        <div className="space-y-1">
+          <CardTitle className={`text-xs font-semibold uppercase tracking-[0.11em] ${hasFg ? "text-white/80" : "text-muted-foreground"}`}>
+            {title}
+          </CardTitle>
+          {description && (
+            <p className={`text-xs ${hasFg ? "text-white/70" : "text-muted-foreground"}`}>
+              {description}
+            </p>
+          )}
+        </div>
+        <div className={`flex h-9 w-9 items-center justify-center rounded-md border ${hasFg ? "border-white/20 bg-white/10" : "border-primary/15 bg-primary/5"}`}>
           <Icon className={`h-4 w-4 ${hasFg ? "text-white" : "text-primary"}`} />
         </div>
       </CardHeader>
       <CardContent>
-        <div className={`text-2xl font-bold font-display tracking-tight ${hasFg ? "text-white" : ""}`}>{value}</div>
-        {description && (
-          <p className={`text-xs mt-1 ${hasFg ? "text-white/70" : "text-muted-foreground"}`}>
-            {description}
-          </p>
-        )}
+        <div className={`text-2xl font-semibold tracking-tight sm:text-3xl ${hasFg ? "text-white" : "text-foreground"}`}>
+          {value}
+        </div>
       </CardContent>
     </Card>
   );
