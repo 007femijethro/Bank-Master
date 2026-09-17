@@ -354,7 +354,7 @@ export default function CustomerDashboard() {
       </section>
 
       <footer className="border-t py-6 text-center text-xs leading-5 text-muted-foreground">
-        © 2026 Redbird FCU · Training & demonstration environment
+        © 2026 Redbird FCU 
       </footer>
     </div>
   );
